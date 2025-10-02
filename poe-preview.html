@@ -1,0 +1,1863 @@
+<!DOCTYPE html><html lang="en"><head><meta name="x-poe-datastore-behavior" content="local_only"><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wellnessHub - Comprehensive Wellness Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        secondary: '#FF6B6B',
+                        success: '#4ECDC4',
+                        warning: '#FFE66D',
+                        dark: '#2C3E50'
+                    },
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                        'pulse-slow': 'pulse 3s infinite',
+                        'slide-up': 'slideUp 0.5s ease-out',
+                        'glow': 'glow 2s ease-in-out infinite alternate'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes glow {
+            from { box-shadow: 0 0 5px #5D5CDE; }
+            to { box-shadow: 0 0 20px #5D5CDE, 0 0 30px #5D5CDE; }
+        }
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .dark .glassmorphism {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .gradient-text {
+            background: linear-gradient(45deg, #5D5CDE, #FF6B6B, #4ECDC4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        .progress-ring-circle {
+            transition: stroke-dasharray 0.35s;
+        }
+        .notification-dot {
+            animation: pulse 2s infinite;
+        }
+    </style>
+<script src="https://puc.poecdn.net/authenticated_preview_page/syncedState.bd4eeeb8e8e02052ee92.js"></script></head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-4">
+                    <div class="gradient-text text-2xl font-bold">YouMatter</div>
+                    <div class="hidden md:flex space-x-4">
+                        <button onclick="showSection('dashboard')" class="nav-btn text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2 rounded-md">Dashboard</button>
+                        <button onclick="showSection('health')" class="nav-btn text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2 rounded-md">Health</button>
+                        <button onclick="showSection('wealth')" class="nav-btn text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2 rounded-md">Wealth</button>
+                        <button onclick="showSection('insurance')" class="nav-btn text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2 rounded-md">Insurance</button>
+                        <button onclick="showSection('community')" class="nav-btn text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2 rounded-md relative">
+                            Community
+                            <span class="notification-dot absolute -top-1 -right-1 w-3 h-3 bg-secondary rounded-full"></span>
+                        </button>
+                        <button onclick="showSection('analytics')" class="nav-btn text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2 rounded-md">Analytics</button>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2 bg-gradient-to-r from-primary to-secondary text-white px-4 py-2 rounded-full">
+                        <i class="fas fa-gem"></i>
+                        <span id="totalPoints" class="font-bold">2,847</span>
+                    </div>
+                    <div class="relative">
+                        <button onclick="toggleNotifications()" class="text-gray-600 dark:text-gray-300 hover:text-primary relative">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span id="notificationBadge" class="absolute -top-2 -right-2 w-5 h-5 bg-secondary text-white text-xs rounded-full flex items-center justify-center">3</span>
+                        </button>
+                    </div>
+                    <div class="w-10 h-10 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white font-bold cursor-pointer" onclick="showProfile()">
+                        JD
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div class="md:hidden border-t border-gray-200 dark:border-gray-700">
+            <div class="flex justify-around py-2">
+                <button onclick="showSection('dashboard')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600 dark:text-gray-300">
+                    <i class="fas fa-home"></i>
+                    <span class="text-xs mt-1">Home</span>
+                </button>
+                <button onclick="showSection('health')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600 dark:text-gray-300">
+                    <i class="fas fa-heartbeat"></i>
+                    <span class="text-xs mt-1">Health</span>
+                </button>
+                <button onclick="showSection('community')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600 dark:text-gray-300 relative">
+                    <i class="fas fa-users"></i>
+                    <span class="text-xs mt-1">Community</span>
+                    <span class="notification-dot absolute top-0 right-4 w-2 h-2 bg-secondary rounded-full"></span>
+                </button>
+                <button onclick="showSection('analytics')" class="mobile-nav-btn flex flex-col items-center py-2 text-gray-600 dark:text-gray-300">
+                    <i class="fas fa-chart-bar"></i>
+                    <span class="text-xs mt-1">Stats</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-16 md:pt-20 pb-20">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section-content">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <!-- Welcome Header -->
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                        Welcome back, <span class="gradient-text">John!</span>
+                    </h1>
+                    <p class="text-xl text-gray-600 dark:text-gray-300">You're on a 7-day wellness streak! 🔥</p>
+                </div>
+
+                <!-- Quick Stats Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow animate-slide-up">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Daily Points</p>
+                                <p class="text-2xl font-bold text-primary" id="dailyPoints">247</p>
+                            </div>
+                            <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-star text-primary text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-gradient-to-r from-primary to-secondary h-2 rounded-full" style="width: 74%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">74% of daily goal</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow animate-slide-up" style="animation-delay: 0.1s">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Level</p>
+                                <p class="text-2xl font-bold text-success">12</p>
+                            </div>
+                            <div class="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-trophy text-success text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-gradient-to-r from-success to-warning h-2 rounded-full" style="width: 65%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">350/500 XP to Level 13</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow animate-slide-up" style="animation-delay: 0.2s">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Streak</p>
+                                <p class="text-2xl font-bold text-warning">7</p>
+                            </div>
+                            <div class="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-fire text-warning text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Personal Best: 21 days</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow animate-slide-up" style="animation-delay: 0.3s">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Challenges</p>
+                                <p class="text-2xl font-bold text-secondary">3/5</p>
+                            </div>
+                            <div class="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-target text-secondary text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Active challenges</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Challenges -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">Today's Challenges</h3>
+                        <button onclick="refreshChallenges()" class="text-primary hover:text-primary/80">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="dailyChallenges">
+                        <!-- Challenges will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Recent Achievements -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Recent Achievements</h3>
+                    <div class="space-y-4" id="recentAchievements">
+                        <!-- Achievements will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Social Feed Preview -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">Community Highlights</h3>
+                        <button onclick="showSection('community')" class="text-primary hover:text-primary/80">View All</button>
+                    </div>
+                    <div class="space-y-4" id="communityHighlights">
+                        <!-- Community highlights will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Health Section -->
+        <section id="health" class="section-content hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">Health &amp; Fitness</h2>
+                
+                <!-- Health Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <!-- Steps Card -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Steps Today</h4>
+                            <i class="fas fa-walking text-primary text-xl"></i>
+                        </div>
+                        <div class="relative w-32 h-32 mx-auto mb-4">
+                            <svg class="progress-ring w-32 h-32">
+                                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" stroke-width="8" fill="none"></circle>
+                                <circle id="stepsCircle" cx="64" cy="64" r="56" stroke="#5D5CDE" stroke-width="8" fill="none" stroke-dasharray="351.86" stroke-dashoffset="105.56"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-2xl font-bold text-gray-900 dark:text-white">8,247</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">/ 10,000</span>
+                            </div>
+                        </div>
+                        <button onclick="logSteps()" class="w-full bg-primary text-white py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                            Log Steps
+                        </button>
+                    </div>
+
+                    <!-- Water Intake Card -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Water Intake</h4>
+                            <i class="fas fa-tint text-blue-500 text-xl"></i>
+                        </div>
+                        <div class="flex items-center justify-center mb-4">
+                            <div class="relative w-20 h-32 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div id="waterLevel" class="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 to-blue-300 rounded-full transition-all duration-500" style="height: 60%"></div>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-sm font-bold text-gray-700 dark:text-gray-300">6/8</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-center text-gray-600 dark:text-gray-400 mb-4">6 glasses of 8</p>
+                        <button onclick="addWater()" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                            Add Glass
+                        </button>
+                    </div>
+
+                    <!-- Workout Card -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Workout</h4>
+                            <i class="fas fa-dumbbell text-success text-xl"></i>
+                        </div>
+                        <div class="text-center mb-4">
+                            <div class="text-3xl font-bold text-success mb-2">45</div>
+                            <p class="text-gray-600 dark:text-gray-400">minutes today</p>
+                        </div>
+                        <div class="space-y-2 mb-4">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600 dark:text-gray-400">Cardio</span>
+                                <span class="text-gray-900 dark:text-white">25 min</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600 dark:text-gray-400">Strength</span>
+                                <span class="text-gray-900 dark:text-white">20 min</span>
+                            </div>
+                        </div>
+                        <button onclick="startWorkout()" class="w-full bg-success text-white py-2 rounded-lg hover:bg-success/90 transition-colors">
+                            Start Workout
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Health Challenges -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Health Challenges</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="healthChallenges">
+                        <!-- Health challenges will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Health Leaderboard -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Weekly Leaderboard</h3>
+                    <div class="space-y-4" id="healthLeaderboard">
+                        <!-- Leaderboard will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Wealth Section -->
+        <section id="wealth" class="section-content hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">Wealth &amp; Financial Wellness</h2>
+                
+                <!-- Financial Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold">Savings Goal</h4>
+                            <i class="fas fa-piggy-bank text-2xl"></i>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-3xl font-bold">$12,450</div>
+                            <div class="text-green-100">of $15,000 goal</div>
+                        </div>
+                        <div class="w-full bg-green-400 rounded-full h-2">
+                            <div class="bg-white h-2 rounded-full" style="width: 83%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold">Investment Growth</h4>
+                            <i class="fas fa-chart-line text-2xl"></i>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-3xl font-bold">+12.4%</div>
+                            <div class="text-blue-100">This year</div>
+                        </div>
+                        <div class="text-sm text-blue-100">Portfolio: $45,230</div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold">Financial Score</h4>
+                            <i class="fas fa-star text-2xl"></i>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-3xl font-bold">847</div>
+                            <div class="text-purple-100">Excellent</div>
+                        </div>
+                        <div class="text-sm text-purple-100">+23 this month</div>
+                    </div>
+                </div>
+
+                <!-- Financial Challenges -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Financial Challenges</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="financialChallenges">
+                        <!-- Financial challenges will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Budget Tracker -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Monthly Budget</h3>
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                <span class="text-gray-700 dark:text-gray-300">Housing</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <div class="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full" style="width: 75%"></div>
+                                </div>
+                                <span class="text-sm text-gray-600 dark:text-gray-400 w-20">$1,500 / $2,000</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <span class="text-gray-700 dark:text-gray-300">Food</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <div class="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 60%"></div>
+                                </div>
+                                <span class="text-sm text-gray-600 dark:text-gray-400 w-20">$360 / $600</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                <span class="text-gray-700 dark:text-gray-300">Entertainment</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <div class="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div class="bg-yellow-500 h-2 rounded-full" style="width: 90%"></div>
+                                </div>
+                                <span class="text-sm text-gray-600 dark:text-gray-400 w-20">$270 / $300</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Investment Learning -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Learning Modules</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-primary transition-colors cursor-pointer">
+                            <div class="flex items-center space-x-3 mb-3">
+                                <i class="fas fa-graduation-cap text-primary"></i>
+                                <h4 class="font-semibold text-gray-900 dark:text-white">Basic Investing</h4>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Learn the fundamentals of investing</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-500 dark:text-gray-400">5 lessons</span>
+                                <span class="text-xs bg-primary text-white px-2 py-1 rounded">+50 XP</span>
+                            </div>
+                        </div>
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-primary transition-colors cursor-pointer">
+                            <div class="flex items-center space-x-3 mb-3">
+                                <i class="fas fa-chart-pie text-success"></i>
+                                <h4 class="font-semibold text-gray-900 dark:text-white">Portfolio Basics</h4>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Build a balanced portfolio</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-500 dark:text-gray-400">7 lessons</span>
+                                <span class="text-xs bg-success text-white px-2 py-1 rounded">+75 XP</span>
+                            </div>
+                        </div>
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-primary transition-colors cursor-pointer">
+                            <div class="flex items-center space-x-3 mb-3">
+                                <i class="fas fa-shield-alt text-warning"></i>
+                                <h4 class="font-semibold text-gray-900 dark:text-white">Risk Management</h4>
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Protect your investments</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-500 dark:text-gray-400">4 lessons</span>
+                                <span class="text-xs bg-warning text-white px-2 py-1 rounded">+40 XP</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Insurance Section -->
+        <section id="insurance" class="section-content hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">Insurance &amp; Protection</h2>
+                
+                <!-- Insurance Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Health Insurance</h4>
+                            <i class="fas fa-heart text-red-500 text-xl"></i>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">Premium Plan</div>
+                            <div class="text-gray-600 dark:text-gray-400">Active since 2022</div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">Coverage</span>
+                                <span class="text-green-600 font-semibold">$500,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">Used this year</span>
+                                <span class="text-gray-900 dark:text-white">$2,340</span>
+                            </div>
+                        </div>
+                        <button class="w-full mt-4 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors">
+                            View Policy
+                        </button>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Life Insurance</h4>
+                            <i class="fas fa-user-shield text-blue-500 text-xl"></i>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">Term Life</div>
+                            <div class="text-gray-600 dark:text-gray-400">20-year term</div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">Coverage</span>
+                                <span class="text-green-600 font-semibold">$1,000,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">Monthly Premium</span>
+                                <span class="text-gray-900 dark:text-white">$75</span>
+                            </div>
+                        </div>
+                        <button class="w-full mt-4 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                            Manage Policy
+                        </button>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Auto Insurance</h4>
+                            <i class="fas fa-car text-green-500 text-xl"></i>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-2xl font-bold text-gray-900 dark:text-white">Full Coverage</div>
+                            <div class="text-gray-600 dark:text-gray-400">2 vehicles</div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">Deductible</span>
+                                <span class="text-gray-900 dark:text-white">$500</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">Safe Driver Discount</span>
+                                <span class="text-green-600 font-semibold">15%</span>
+                            </div>
+                        </div>
+                        <button class="w-full mt-4 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors">
+                            Update Coverage
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Insurance Gamification -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Insurance Rewards Program</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">Safe Driver Score</h4>
+                                <span class="text-2xl font-bold text-green-500">94</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-3">
+                                <div class="bg-gradient-to-r from-green-500 to-green-400 h-3 rounded-full" style="width: 94%"></div>
+                            </div>
+                            <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                <span>Excellent driving</span>
+                                <span>-10% premium</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">Health Score</h4>
+                                <span class="text-2xl font-bold text-blue-500">87</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-3">
+                                <div class="bg-gradient-to-r from-blue-500 to-blue-400 h-3 rounded-full" style="width: 87%"></div>
+                            </div>
+                            <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                <span>Great health habits</span>
+                                <span>Wellness bonus</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="text-center p-4 bg-primary/10 rounded-lg">
+                            <i class="fas fa-calendar-check text-primary text-2xl mb-2"></i>
+                            <h5 class="font-semibold text-gray-900 dark:text-white">Regular Check-ups</h5>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Complete annual health check</p>
+                            <span class="inline-block mt-2 bg-primary text-white text-xs px-2 py-1 rounded">+100 points</span>
+                        </div>
+
+                        <div class="text-center p-4 bg-success/10 rounded-lg">
+                            <i class="fas fa-car-side text-success text-2xl mb-2"></i>
+                            <h5 class="font-semibold text-gray-900 dark:text-white">Safe Miles</h5>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Drive 1000 miles safely</p>
+                            <span class="inline-block mt-2 bg-success text-white text-xs px-2 py-1 rounded">+50 points</span>
+                        </div>
+
+                        <div class="text-center p-4 bg-warning/10 rounded-lg">
+                            <i class="fas fa-file-alt text-warning text-2xl mb-2"></i>
+                            <h5 class="font-semibold text-gray-900 dark:text-white">Policy Review</h5>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Annual policy review</p>
+                            <span class="inline-block mt-2 bg-warning text-white text-xs px-2 py-1 rounded">+75 points</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Claims & Support -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Claims &amp; Support</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-4">Recent Claims</h4>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                    <div>
+                                        <div class="font-medium text-gray-900 dark:text-white">Dental Cleaning</div>
+                                        <div class="text-sm text-gray-600 dark:text-gray-400">March 15, 2024</div>
+                                    </div>
+                                    <span class="text-green-600 font-semibold">Approved</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                    <div>
+                                        <div class="font-medium text-gray-900 dark:text-white">Eye Exam</div>
+                                        <div class="text-sm text-gray-600 dark:text-gray-400">February 28, 2024</div>
+                                    </div>
+                                    <span class="text-green-600 font-semibold">Paid</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h4>
+                            <div class="space-y-3">
+                                <button class="w-full flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary transition-colors">
+                                    <div class="flex items-center space-x-3">
+                                        <i class="fas fa-plus-circle text-primary"></i>
+                                        <span class="text-gray-900 dark:text-white">File New Claim</span>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </button>
+                                <button class="w-full flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary transition-colors">
+                                    <div class="flex items-center space-x-3">
+                                        <i class="fas fa-phone text-primary"></i>
+                                        <span class="text-gray-900 dark:text-white">Contact Support</span>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </button>
+                                <button class="w-full flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary transition-colors">
+                                    <div class="flex items-center space-x-3">
+                                        <i class="fas fa-download text-primary"></i>
+                                        <span class="text-gray-900 dark:text-white">Download Documents</span>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Community Section -->
+        <section id="community" class="section-content hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">Community &amp; Challenges</h2>
+                
+                <!-- Community Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-gradient-to-r from-primary to-secondary text-white rounded-xl p-6">
+                        <h4 class="text-lg font-semibold mb-2">Global Rank</h4>
+                        <div class="text-3xl font-bold">#247</div>
+                        <div class="text-sm opacity-90">Out of 50k users</div>
+                    </div>
+                    <div class="bg-gradient-to-r from-success to-blue-500 text-white rounded-xl p-6">
+                        <h4 class="text-lg font-semibold mb-2">Friends</h4>
+                        <div class="text-3xl font-bold">23</div>
+                        <div class="text-sm opacity-90">Connected users</div>
+                    </div>
+                    <div class="bg-gradient-to-r from-warning to-orange-500 text-white rounded-xl p-6">
+                        <h4 class="text-lg font-semibold mb-2">Teams</h4>
+                        <div class="text-3xl font-bold">3</div>
+                        <div class="text-sm opacity-90">Active teams</div>
+                    </div>
+                    <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl p-6">
+                        <h4 class="text-lg font-semibold mb-2">Shared</h4>
+                        <div class="text-3xl font-bold">12</div>
+                        <div class="text-sm opacity-90">This week</div>
+                    </div>
+                </div>
+
+                <!-- Active Challenges -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">Active Community Challenges</h3>
+                        <button onclick="createChallenge()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                            Create Challenge
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="communityChallenges">
+                        <!-- Community challenges will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Social Feed -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">Activity Feed</h3>
+                        <button onclick="shareAchievement()" class="bg-secondary text-white px-4 py-2 rounded-lg hover:bg-secondary/90 transition-colors">
+                            Share Update
+                        </button>
+                    </div>
+                    <div class="space-y-6" id="activityFeed">
+                        <!-- Activity feed will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Teams & Groups -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Your Teams</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="userTeams">
+                        <!-- User teams will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics" class="section-content hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-8">Analytics &amp; Insights</h2>
+                
+                <!-- Analytics Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Engagement</h4>
+                            <i class="fas fa-chart-line text-primary text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-bold text-primary mb-2">94%</div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Daily active rate</div>
+                        <div class="flex items-center mt-2">
+                            <i class="fas fa-arrow-up text-green-500 text-sm mr-1"></i>
+                            <span class="text-green-500 text-sm">+5.2% from last week</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Wellness Score</h4>
+                            <i class="fas fa-heart text-red-500 text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-bold text-red-500 mb-2">8.7</div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Out of 10</div>
+                        <div class="flex items-center mt-2">
+                            <i class="fas fa-arrow-up text-green-500 text-sm mr-1"></i>
+                            <span class="text-green-500 text-sm">+0.3 this month</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Achievements</h4>
+                            <i class="fas fa-trophy text-warning text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-bold text-warning mb-2">47</div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Total earned</div>
+                        <div class="flex items-center mt-2">
+                            <i class="fas fa-plus text-blue-500 text-sm mr-1"></i>
+                            <span class="text-blue-500 text-sm">3 new this week</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Social Impact</h4>
+                            <i class="fas fa-users text-success text-xl"></i>
+                        </div>
+                        <div class="text-3xl font-bold text-success mb-2">156</div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">People influenced</div>
+                        <div class="flex items-center mt-2">
+                            <i class="fas fa-arrow-up text-green-500 text-sm mr-1"></i>
+                            <span class="text-green-500 text-sm">+12 this week</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Weekly Activity</h3>
+                        <canvas id="weeklyActivityChart" width="400" height="200"></canvas>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Wellness Categories</h3>
+                        <canvas id="wellnessCategoriesChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+
+                <!-- Detailed Analytics -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Detailed Insights</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-4">Feature Usage</h4>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-600 dark:text-gray-400">Health Tracking</span>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div class="bg-primary h-2 rounded-full" style="width: 85%"></div>
+                                        </div>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">85%</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-600 dark:text-gray-400">Insurance Services</span>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div class="bg-secondary h-2 rounded-full" style="width: 72%"></div>
+                                        </div>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">72%</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-600 dark:text-gray-400">Financial Wellness</span>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div class="bg-success h-2 rounded-full" style="width: 68%"></div>
+                                        </div>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">68%</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-600 dark:text-gray-400">Community Features</span>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                            <div class="bg-warning h-2 rounded-full" style="width: 45%"></div>
+                                        </div>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">45%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-4">Improvement Suggestions</h4>
+                            <div class="space-y-3">
+                                <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
+                                    <h5 class="font-medium text-blue-900 dark:text-blue-300">Increase Water Intake</h5>
+                                    <p class="text-sm text-blue-700 dark:text-blue-400">You're averaging 6 glasses daily. Try for 8!</p>
+                                </div>
+                                <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
+                                    <h5 class="font-medium text-green-900 dark:text-green-300">Great Job on Steps!</h5>
+                                    <p class="text-sm text-green-700 dark:text-green-400">You've exceeded your daily goal 5 days this week.</p>
+                                </div>
+                                <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border-l-4 border-yellow-500">
+                                    <h5 class="font-medium text-yellow-900 dark:text-yellow-300">Join More Challenges</h5>
+                                    <p class="text-sm text-yellow-700 dark:text-yellow-400">Community challenges can boost your motivation!</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Insights -->
+                <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl p-6 text-white">
+                    <h3 class="text-xl font-bold mb-4">🤖 AI-Powered Insights</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-semibold mb-2">Personalized Recommendations</h4>
+                            <ul class="space-y-1 text-sm opacity-90">
+                                <li>• Your most active time is 7-9 AM - schedule workouts then</li>
+                                <li>• You perform 23% better in team challenges</li>
+                                <li>• Financial goals progress faster when paired with health goals</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold mb-2">Predicted Outcomes</h4>
+                            <ul class="space-y-1 text-sm opacity-90">
+                                <li>• 89% chance of reaching monthly step goal</li>
+                                <li>• Optimal challenge difficulty: Medium-Hard</li>
+                                <li>• Best time for new habits: Weekday mornings</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Floating Action Button -->
+    <div class="fixed bottom-6 right-6 z-40">
+        <button onclick="quickAction()" class="w-14 h-14 bg-gradient-to-r from-primary to-secondary text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 animate-glow">
+            <i class="fas fa-plus text-xl"></i>
+        </button>
+    </div>
+
+    <!-- Notification Panel -->
+    <div id="notificationPanel" class="fixed top-16 right-4 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-xl z-50 hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white">Notifications</h3>
+        </div>
+        <div class="max-h-96 overflow-y-auto">
+            <div class="p-4 space-y-3" id="notificationList">
+                <!-- Notifications will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modalContainer" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4">
+            <div id="modalContent">
+                <!-- Modal content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode detection and handling
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Application state
+        let appState = {
+            currentSection: 'dashboard',
+            userPoints: 2847,
+            dailyPoints: 247,
+            userLevel: 12,
+            userXP: 350,
+            streak: 7,
+            activeChallenges: 3,
+            completedChallenges: 5,
+            waterIntake: 6,
+            steps: 8247,
+            workoutMinutes: 45
+        };
+
+        // Sample data
+        const challenges = [
+            {
+                id: 1,
+                title: "10,000 Steps Daily",
+                description: "Walk 10,000 steps every day this week",
+                type: "health",
+                points: 100,
+                progress: 74,
+                timeLeft: "2 days",
+                participants: 1247,
+                icon: "fa-walking"
+            },
+            {
+                id: 2,
+                title: "Save $50 This Week",
+                description: "Track expenses and save $50",
+                type: "wealth",
+                points: 150,
+                progress: 60,
+                timeLeft: "4 days",
+                participants: 892,
+                icon: "fa-piggy-bank"
+            },
+            {
+                id: 3,
+                title: "Meditation Streak",
+                description: "Meditate for 10 minutes daily",
+                type: "wellness",
+                points: 75,
+                progress: 85,
+                timeLeft: "1 day",
+                participants: 634,
+                icon: "fa-leaf"
+            }
+        ];
+
+        const achievements = [
+            {
+                title: "Step Master",
+                description: "Walked 50,000 steps this week",
+                points: 200,
+                time: "2 hours ago",
+                icon: "fa-walking",
+                color: "primary"
+            },
+            {
+                title: "Savings Champion",
+                description: "Reached monthly savings goal",
+                points: 300,
+                time: "1 day ago",
+                icon: "fa-piggy-bank",
+                color: "success"
+            },
+            {
+                title: "Community Leader",
+                description: "Helped 5 friends complete challenges",
+                points: 250,
+                time: "3 days ago",
+                icon: "fa-users",
+                color: "secondary"
+            }
+        ];
+
+        const communityHighlights = [
+            {
+                user: "Sarah M.",
+                action: "completed the 30-day fitness challenge",
+                time: "5 min ago",
+                likes: 12,
+                avatar: "SM"
+            },
+            {
+                user: "Mike Johnson",
+                action: "saved $500 this month using budgeting tools",
+                time: "1 hour ago",
+                likes: 8,
+                avatar: "MJ"
+            },
+            {
+                user: "Emily R.",
+                action: "reached Level 15 in wellness journey",
+                time: "2 hours ago",
+                likes: 15,
+                avatar: "ER"
+            }
+        ];
+
+        // Navigation functions
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.section-content').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionName).classList.remove('hidden');
+            
+            // Update navigation styles
+            document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => {
+                btn.classList.remove('text-primary');
+                btn.classList.add('text-gray-600', 'dark:text-gray-300');
+            });
+            
+            // Highlight active nav
+            event.target.classList.remove('text-gray-600', 'dark:text-gray-300');
+            event.target.classList.add('text-primary');
+            
+            appState.currentSection = sectionName;
+            
+            // Initialize section-specific content
+            if (sectionName === 'analytics') {
+                initializeCharts();
+            }
+        }
+
+        // Initialize dashboard content
+        function initializeDashboard() {
+            populateDailyChallenges();
+            populateRecentAchievements();
+            populateCommunityHighlights();
+        }
+
+        function populateDailyChallenges() {
+            const container = document.getElementById('dailyChallenges');
+            container.innerHTML = challenges.map(challenge => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-primary transition-colors cursor-pointer" onclick="joinChallenge(${challenge.id})">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas ${challenge.icon} text-primary text-xl"></i>
+                            <h4 class="font-semibold text-gray-900 dark:text-white">${challenge.title}</h4>
+                        </div>
+                        <span class="text-xs bg-primary text-white px-2 py-1 rounded">+${challenge.points} XP</span>
+                    </div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">${challenge.description}</p>
+                    <div class="mb-3">
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div class="bg-gradient-to-r from-primary to-secondary h-2 rounded-full transition-all duration-500" style="width: ${challenge.progress}%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <span>${challenge.progress}% complete</span>
+                            <span>${challenge.timeLeft} left</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">${challenge.participants.toLocaleString()} participants</span>
+                        <button class="text-primary hover:text-primary/80 font-medium">Join Challenge</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateRecentAchievements() {
+            const container = document.getElementById('recentAchievements');
+            container.innerHTML = achievements.map(achievement => `
+                <div class="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="w-12 h-12 bg-${achievement.color}/10 rounded-lg flex items-center justify-center">
+                        <i class="fas ${achievement.icon} text-${achievement.color} text-xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-gray-900 dark:text-white">${achievement.title}</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">${achievement.description}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">${achievement.time}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-lg font-bold text-${achievement.color}">+${achievement.points}</span>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">points</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateCommunityHighlights() {
+            const container = document.getElementById('communityHighlights');
+            container.innerHTML = communityHighlights.map(highlight => `
+                <div class="flex items-center space-x-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div class="w-10 h-10 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white font-bold text-sm">
+                        ${highlight.avatar}
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-gray-900 dark:text-white"><span class="font-semibold">${highlight.user}</span> ${highlight.action}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">${highlight.time}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="likePost()" class="text-gray-400 hover:text-red-500 transition-colors">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">${highlight.likes}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Health section functions
+        function logSteps() {
+            showModal('Log Steps', `
+                <div class="space-y-4">
+                    <input type="number" placeholder="Enter steps" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-base" id="stepsInput">
+                    <div class="flex space-x-3">
+                        <button onclick="closeModal()" class="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">Cancel</button>
+                        <button onclick="updateSteps()" class="flex-1 px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded">Update</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function updateSteps() {
+            const input = document.getElementById('stepsInput');
+            const steps = parseInt(input.value);
+            if (steps && steps > 0) {
+                appState.steps += steps;
+                appState.dailyPoints += Math.floor(steps / 100);
+                updateUI();
+                showNotification('Steps logged successfully!', 'success');
+                closeModal();
+            }
+        }
+
+        function addWater() {
+            if (appState.waterIntake < 8) {
+                appState.waterIntake++;
+                appState.dailyPoints += 10;
+                updateWaterUI();
+                updateUI();
+                showNotification('Water logged! Keep hydrating!', 'success');
+                
+                if (appState.waterIntake === 8) {
+                    showNotification('🎉 Daily water goal achieved! +50 bonus points', 'success');
+                    appState.dailyPoints += 50;
+                    updateUI();
+                }
+            }
+        }
+
+        function updateWaterUI() {
+            const waterLevel = document.getElementById('waterLevel');
+            const percentage = (appState.waterIntake / 8) * 100;
+            waterLevel.style.height = percentage + '%';
+        }
+
+        function startWorkout() {
+            showModal('Start Workout', `
+                <div class="space-y-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Choose Workout Type</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="selectWorkout('cardio')" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors">
+                            <i class="fas fa-running text-2xl text-primary mb-2"></i>
+                            <div class="font-medium">Cardio</div>
+                        </button>
+                        <button onclick="selectWorkout('strength')" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors">
+                            <i class="fas fa-dumbbell text-2xl text-success mb-2"></i>
+                            <div class="font-medium">Strength</div>
+                        </button>
+                        <button onclick="selectWorkout('yoga')" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors">
+                            <i class="fas fa-leaf text-2xl text-warning mb-2"></i>
+                            <div class="font-medium">Yoga</div>
+                        </button>
+                        <button onclick="selectWorkout('hiit')" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors">
+                            <i class="fas fa-fire text-2xl text-secondary mb-2"></i>
+                            <div class="font-medium">HIIT</div>
+                        </button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function selectWorkout(type) {
+            closeModal();
+            showNotification(`Starting ${type} workout! Timer started.`, 'info');
+            appState.workoutMinutes += 30;
+            appState.dailyPoints += 50;
+            updateUI();
+        }
+
+        // Utility functions
+        function updateUI() {
+            document.getElementById('totalPoints').textContent = appState.userPoints.toLocaleString();
+            document.getElementById('dailyPoints').textContent = appState.dailyPoints;
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm animate-slide-up ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
+            } text-white`;
+            notification.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <i class="fas ${
+                        type === 'success' ? 'fa-check-circle' :
+                        type === 'error' ? 'fa-exclamation-triangle' :
+                        type === 'warning' ? 'fa-exclamation-circle' : 'fa-info-circle'
+                    }"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function showModal(title, content) {
+            const modal = document.getElementById('modalContainer');
+            const modalContent = document.getElementById('modalContent');
+            
+            modalContent.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">${title}</h3>
+                    <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                ${content}
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modalContainer').classList.add('hidden');
+        }
+
+        function toggleNotifications() {
+            const panel = document.getElementById('notificationPanel');
+            panel.classList.toggle('hidden');
+            
+            if (!panel.classList.contains('hidden')) {
+                populateNotifications();
+            }
+        }
+
+        function populateNotifications() {
+            const container = document.getElementById('notificationList');
+            const notifications = [
+                {
+                    title: "Challenge Complete!",
+                    message: "You've completed the 10,000 steps challenge",
+                    time: "5 min ago",
+                    type: "success"
+                },
+                {
+                    title: "Friend Request",
+                    message: "Sarah wants to connect with you",
+                    time: "1 hour ago",
+                    type: "info"
+                },
+                {
+                    title: "Weekly Report",
+                    message: "Your wellness report is ready",
+                    time: "2 hours ago",
+                    type: "info"
+                }
+            ];
+            
+            container.innerHTML = notifications.map(notif => `
+                <div class="flex items-start space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer">
+                    <div class="w-2 h-2 ${notif.type === 'success' ? 'bg-green-500' : 'bg-blue-500'} rounded-full mt-2"></div>
+                    <div class="flex-1">
+                        <h4 class="font-medium text-gray-900 dark:text-white text-sm">${notif.title}</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">${notif.message}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">${notif.time}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function quickAction() {
+            showModal('Quick Actions', `
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="logSteps(); closeModal();" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors text-center">
+                        <i class="fas fa-walking text-2xl text-primary mb-2"></i>
+                        <div class="font-medium text-gray-900 dark:text-white">Log Steps</div>
+                    </button>
+                    <button onclick="addWater(); closeModal();" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors text-center">
+                        <i class="fas fa-tint text-2xl text-blue-500 mb-2"></i>
+                        <div class="font-medium text-gray-900 dark:text-white">Add Water</div>
+                    </button>
+                    <button onclick="startWorkout(); closeModal();" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors text-center">
+                        <i class="fas fa-dumbbell text-2xl text-success mb-2"></i>
+                        <div class="font-medium text-gray-900 dark:text-white">Workout</div>
+                    </button>
+                    <button onclick="shareAchievement(); closeModal();" class="p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary transition-colors text-center">
+                        <i class="fas fa-share text-2xl text-secondary mb-2"></i>
+                        <div class="font-medium text-gray-900 dark:text-white">Share</div>
+                    </button>
+                </div>
+            `);
+        }
+
+        function refreshChallenges() {
+            showNotification('Challenges refreshed!', 'info');
+            populateDailyChallenges();
+        }
+
+        function joinChallenge(challengeId) {
+            showNotification('Challenge joined! Good luck!', 'success');
+            appState.activeChallenges++;
+        }
+
+        function likePost() {
+            showNotification('Post liked!', 'success');
+        }
+
+        function shareAchievement() {
+            showModal('Share Achievement', `
+                <div class="space-y-4">
+                    <textarea placeholder="Share your progress..." class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-base" rows="3"></textarea>
+                    <div class="flex space-x-3">
+                        <button onclick="closeModal()" class="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">Cancel</button>
+                        <button onclick="postAchievement()" class="flex-1 px-4 py-2 bg-secondary text-white hover:bg-secondary/90 rounded">Share</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function postAchievement() {
+            showNotification('Achievement shared with community!', 'success');
+            appState.dailyPoints += 25;
+            updateUI();
+            closeModal();
+        }
+
+        function createChallenge() {
+            showModal('Create Challenge', `
+                <div class="space-y-4">
+                    <input type="text" placeholder="Challenge title" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-base">
+                    <textarea placeholder="Challenge description" class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-base" rows="3"></textarea>
+                    <select class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-base">
+                        <option>Health & Fitness</option>
+                        <option>Financial Wellness</option>
+                        <option>Community Service</option>
+                        <option>Learning & Growth</option>
+                    </select>
+                    <div class="flex space-x-3">
+                        <button onclick="closeModal()" class="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">Cancel</button>
+                        <button onclick="submitChallenge()" class="flex-1 px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded">Create</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        function submitChallenge() {
+            showNotification('Challenge created! Inviting friends...', 'success');
+            closeModal();
+        }
+
+        function showProfile() {
+            showModal('User Profile', `
+                <div class="text-center space-y-4">
+                    <div class="w-20 h-20 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto">
+                        JD
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">John Doe</h3>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-primary">${appState.userLevel}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Level</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-success">${appState.streak}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Day Streak</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-warning">47</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Achievements</div>
+                        </div>
+                    </div>
+                    <button onclick="closeModal()" class="w-full px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded">Close</button>
+                </div>
+            `);
+        }
+
+        // Analytics functions
+        function initializeCharts() {
+            setTimeout(() => {
+                createWeeklyActivityChart();
+                createWellnessCategoriesChart();
+            }, 100);
+        }
+
+        function createWeeklyActivityChart() {
+            const ctx = document.getElementById('weeklyActivityChart');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Daily Points',
+                        data: [230, 180, 290, 250, 340, 280, 247],
+                        borderColor: '#5D5CDE',
+                        backgroundColor: 'rgba(93, 92, 222, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(156, 163, 175, 0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(156, 163, 175, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createWellnessCategoriesChart() {
+            const ctx = document.getElementById('wellnessCategoriesChart');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Health', 'Wealth', 'Insurance', 'Community'],
+                    datasets: [{
+                        data: [35, 25, 20, 20],
+                        backgroundColor: ['#5D5CDE', '#4ECDC4', '#FF6B6B', '#FFE66D']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+            updateWaterUI();
+            
+            // Close modal when clicking outside
+            document.getElementById('modalContainer').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeModal();
+                }
+            });
+            
+            // Close notifications when clicking outside
+            document.addEventListener('click', function(e) {
+                const panel = document.getElementById('notificationPanel');
+                const button = e.target.closest('button');
+                if (!panel.contains(e.target) && button?.onclick?.toString().indexOf('toggleNotifications') === -1) {
+                    panel.classList.add('hidden');
+                }
+            });
+            
+            // Populate health challenges
+            setTimeout(() => {
+                populateHealthChallenges();
+                populateFinancialChallenges();
+                populateCommunityContent();
+            }, 500);
+        });
+
+        function populateHealthChallenges() {
+            const container = document.getElementById('healthChallenges');
+            if (!container) return;
+            
+            const healthChallenges = [
+                {
+                    title: "Marathon Training",
+                    description: "Complete a 26.2 mile training program",
+                    progress: 45,
+                    participants: 2341,
+                    timeLeft: "12 weeks",
+                    difficulty: "Hard",
+                    points: 500
+                },
+                {
+                    title: "Hydration Hero",
+                    description: "Drink 8 glasses of water daily for 30 days",
+                    progress: 73,
+                    participants: 5672,
+                    timeLeft: "8 days",
+                    difficulty: "Easy",
+                    points: 200
+                }
+            ];
+            
+            container.innerHTML = healthChallenges.map(challenge => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:border-primary transition-colors">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">${challenge.title}</h4>
+                        <span class="text-xs px-2 py-1 rounded ${
+                            challenge.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                            challenge.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                        }">${challenge.difficulty}</span>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">${challenge.description}</p>
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-600 dark:text-gray-400">Progress</span>
+                            <span class="text-gray-900 dark:text-white">${challenge.progress}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div class="bg-gradient-to-r from-primary to-secondary h-2 rounded-full" style="width: ${challenge.progress}%"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">${challenge.participants.toLocaleString()} joined</span>
+                        <span class="text-primary font-medium">+${challenge.points} XP</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateFinancialChallenges() {
+            const container = document.getElementById('financialChallenges');
+            if (!container) return;
+            
+            const financialChallenges = [
+                {
+                    title: "Emergency Fund Builder",
+                    description: "Save $1000 for emergency fund",
+                    progress: 65,
+                    participants: 1823,
+                    timeLeft: "6 weeks",
+                    points: 300
+                },
+                {
+                    title: "Expense Tracker",
+                    description: "Track all expenses for 30 days",
+                    progress: 80,
+                    participants: 3456,
+                    timeLeft: "6 days",
+                    points: 150
+                }
+            ];
+            
+            container.innerHTML = financialChallenges.map(challenge => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:border-primary transition-colors">
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">${challenge.title}</h4>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">${challenge.description}</p>
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-600 dark:text-gray-400">Progress</span>
+                            <span class="text-gray-900 dark:text-white">${challenge.progress}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div class="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full" style="width: ${challenge.progress}%"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">${challenge.participants.toLocaleString()} joined</span>
+                        <span class="text-green-600 font-medium">+${challenge.points} XP</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateCommunityContent() {
+            populateCommunityChallenges();
+            populateActivityFeed();
+            populateUserTeams();
+            populateHealthLeaderboard();
+        }
+
+        function populateCommunityChallenges() {
+            const container = document.getElementById('communityChallenges');
+            if (!container) return;
+            
+            const communityChallenges = [
+                {
+                    title: "Team Fitness Challenge",
+                    description: "Collective goal of 1M steps",
+                    progress: 68,
+                    members: 156,
+                    creator: "FitSquad Team",
+                    prize: "Gift Cards"
+                },
+                {
+                    title: "Savings Race",
+                    description: "Who can save the most this month?",
+                    progress: 45,
+                    members: 89,
+                    creator: "Budget Buddies",
+                    prize: "Financial Consultation"
+                },
+                {
+                    title: "Wellness Warriors",
+                    description: "Complete 5 wellness activities",
+                    progress: 72,
+                    members: 234,
+                    creator: "Health Heroes",
+                    prize: "Wellness Retreat"
+                }
+            ];
+            
+            container.innerHTML = communityChallenges.map(challenge => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:border-primary transition-colors">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">${challenge.title}</h4>
+                        <span class="text-xs bg-secondary text-white px-2 py-1 rounded">${challenge.prize}</span>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">${challenge.description}</p>
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-600 dark:text-gray-400">Team Progress</span>
+                            <span class="text-gray-900 dark:text-white">${challenge.progress}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                            <div class="bg-gradient-to-r from-secondary to-primary h-3 rounded-full" style="width: ${challenge.progress}%"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">${challenge.members} members</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">by ${challenge.creator}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateActivityFeed() {
+            const container = document.getElementById('activityFeed');
+            if (!container) return;
+            
+            const activities = [
+                {
+                    user: "Alex Thompson",
+                    avatar: "AT",
+                    action: "completed the Marathon Training milestone",
+                    time: "2 minutes ago",
+                    likes: 24,
+                    comments: 8,
+                    image: null
+                },
+                {
+                    user: "Maria Garcia",
+                    avatar: "MG",
+                    action: "saved $200 using the budgeting tools",
+                    time: "15 minutes ago",
+                    likes: 16,
+                    comments: 3,
+                    image: null
+                },
+                {
+                    user: "David Kim",
+                    avatar: "DK",
+                    action: "reached Level 20 and shared workout tips",
+                    time: "1 hour ago",
+                    likes: 45,
+                    comments: 12,
+                    image: "workout"
+                },
+                {
+                    user: "Sarah Wilson",
+                    avatar: "SW",
+                    action: "completed insurance health assessment",
+                    time: "2 hours ago",
+                    likes: 8,
+                    comments: 2,
+                    image: null
+                }
+            ];
+            
+            container.innerHTML = activities.map(activity => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                    <div class="flex items-start space-x-4">
+                        <div class="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-white font-bold">
+                            ${activity.avatar}
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-gray-900 dark:text-white mb-2">
+                                <span class="font-semibold">${activity.user}</span> ${activity.action}
+                            </p>
+                            ${activity.image ? `
+                                <div class="mb-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                    <i class="fas fa-image text-gray-400 text-2xl"></i>
+                                    <span class="text-gray-600 dark:text-gray-400 ml-2">Shared workout image</span>
+                                </div>
+                            ` : ''}
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-500 dark:text-gray-400">${activity.time}</span>
+                                <div class="flex items-center space-x-4">
+                                    <button class="flex items-center space-x-1 text-gray-500 hover:text-red-500 transition-colors">
+                                        <i class="fas fa-heart"></i>
+                                        <span class="text-sm">${activity.likes}</span>
+                                    </button>
+                                    <button class="flex items-center space-x-1 text-gray-500 hover:text-blue-500 transition-colors">
+                                        <i class="fas fa-comment"></i>
+                                        <span class="text-sm">${activity.comments}</span>
+                                    </button>
+                                    <button class="text-gray-500 hover:text-green-500 transition-colors">
+                                        <i class="fas fa-share"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateUserTeams() {
+            const container = document.getElementById('userTeams');
+            if (!container) return;
+            
+            const teams = [
+                {
+                    name: "Fitness Fanatics",
+                    members: 24,
+                    rank: 3,
+                    category: "Health",
+                    color: "primary"
+                },
+                {
+                    name: "Savings Squad",
+                    members: 18,
+                    rank: 7,
+                    category: "Wealth",
+                    color: "success"
+                },
+                {
+                    name: "Wellness Warriors",
+                    members: 31,
+                    rank: 1,
+                    category: "Overall",
+                    color: "secondary"
+                }
+            ];
+            
+            container.innerHTML = teams.map(team => `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:border-${team.color} transition-colors">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">${team.name}</h4>
+                        <span class="text-2xl font-bold text-${team.color}">#{team.rank}</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Category</span>
+                            <span class="text-gray-900 dark:text-white">${team.category}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Members</span>
+                            <span class="text-gray-900 dark:text-white">${team.members}</span>
+                        </div>
+                    </div>
+                    <button class="w-full mt-4 bg-${team.color} text-white py-2 rounded-lg hover:bg-${team.color}/90 transition-colors">
+                        View Team
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function populateHealthLeaderboard() {
+            const container = document.getElementById('healthLeaderboard');
+            if (!container) return;
+            
+            const leaderboard = [
+                { rank: 1, name: "You", points: 2847, avatar: "JD", change: "+2" },
+                { rank: 2, name: "Sarah M.", points: 2756, avatar: "SM", change: "-1" },
+                { rank: 3, name: "Mike J.", points: 2698, avatar: "MJ", change: "+3" },
+                { rank: 4, name: "Emily R.", points: 2634, avatar: "ER", change: "-1" },
+                { rank: 5, name: "Alex T.", points: 2587, avatar: "AT", change: "0" }
+            ];
+            
+            container.innerHTML = leaderboard.map(user => `
+                <div class="flex items-center justify-between p-4 ${user.rank === 1 ? 'bg-primary/10 border border-primary' : 'bg-gray-50 dark:bg-gray-700'} rounded-lg">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-2xl font-bold ${user.rank === 1 ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}">#${user.rank}</span>
+                            ${user.change !== "0" ? `
+                                <i class="fas fa-arrow-${user.change.startsWith('+') ? 'up text-green-500' : 'down text-red-500'} text-sm"></i>
+                            ` : ''}
+                        </div>
+                        <div class="w-10 h-10 ${user.rank === 1 ? 'bg-gradient-to-r from-primary to-secondary' : 'bg-gray-400'} rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            ${user.avatar}
+                        </div>
+                        <div>
+                            <div class="font-semibold ${user.rank === 1 ? 'text-primary' : 'text-gray-900 dark:text-white'}">${user.name}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">${user.points.toLocaleString()} points</div>
+                        </div>
+                    </div>
+                    ${user.rank === 1 ? `
+                        <div class="text-primary font-semibold">
+                            <i class="fas fa-crown mr-1"></i>
+                            Leader
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+    </script>
+
+
+</body></html>
