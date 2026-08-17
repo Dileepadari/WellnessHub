@@ -3,7 +3,7 @@ const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Team = require('../models/Team');
 const Challenge = require('../models/Challenge');
-const { protect, rateLimitByUser, validateResource, authorize } = require('../middleware/auth');
+const { protect, rateLimitByUser, validateResource } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -37,7 +37,9 @@ router.get('/feed', protect, async (req, res, next) => {
     const user = req.user;
 
     // Get activities from friends and followed users
-    const followingIds = [...user.following, ...user.friends];
+    // The schema field is `followedUsers`; `following` does not exist and made
+    // this route throw for every user.
+    const followingIds = [...(user.followedUsers || []), ...(user.friends || [])];
     followingIds.push(user._id); // Include own activities
 
     // Aggregate recent activities from the user's network
@@ -103,244 +105,149 @@ router.get('/feed', protect, async (req, res, next) => {
  * @swagger
  * /api/community/teams:
  *   get:
- *     summary: Get teams
+ *     summary: Public teams
  *     tags: [Community]
- *     parameters:
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Search term for team names
- *       - in: query
- *         name: category
- *         schema:
- *           type: string
- *         description: Filter by category
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *         description: Number of teams to return
- *     responses:
- *       200:
- *         description: Teams retrieved successfully
+ *   post:
+ *     summary: Create a team
+ *     tags: [Community]
+ *     security:
+ *       - bearerAuth: []
  */
 router.get('/teams', async (req, res, next) => {
   try {
     const { search, category, limit = 20 } = req.query;
-    
-    let query = { isActive: true, isPublic: true };
-    
+
+    const query = { isActive: true, isPublic: true };
+
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
       ];
     }
-    
-    if (category) {
-      query.category = category;
-    }
+    if (category) query.category = category;
 
+    // The schema stores `creator` and `members[].userId`; there is no `captain`
+    // field and `members` is a subdocument array, not an array of refs.
     const teams = await Team.find(query)
-      .populate('captain', 'username firstName lastName avatar level')
-      .populate('members', 'username firstName lastName avatar level')
+      .populate('creator', 'username firstName lastName avatar level')
       .sort({ 'stats.totalPoints': -1, createdAt: -1 })
       .limit(parseInt(limit));
 
-    res.status(200).json({
-      success: true,
-      data: teams
-    });
+    res.status(200).json({ success: true, data: teams });
   } catch (error) {
     next(error);
   }
 });
 
-/**
- * @swagger
- * /api/community/teams:
- *   post:
- *     summary: Create a new team
- *     tags: [Community]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - description
- *             properties:
- *               name:
- *                 type: string
- *               description:
- *                 type: string
- *               category:
- *                 type: string
- *               isPublic:
- *                 type: boolean
- *               maxMembers:
- *                 type: number
- *     responses:
- *       201:
- *         description: Team created successfully
- */
-router.post('/teams', protect, rateLimitByUser(3, 24 * 60 * 60 * 1000), [
-  body('name')
-    .trim()
-    .isLength({ min: 3, max: 50 })
-    .withMessage('Team name must be between 3 and 50 characters'),
-  body('description')
-    .trim()
-    .isLength({ min: 10, max: 200 })
-    .withMessage('Description must be between 10 and 200 characters'),
-  body('category')
-    .optional()
-    .isIn(['health', 'wealth', 'insurance', 'wellness', 'general'])
-    .withMessage('Invalid category'),
-  body('maxMembers')
-    .optional()
-    .isInt({ min: 2, max: 50 })
-    .withMessage('Max members must be between 2 and 50')
-], async (req, res, next) => {
-  try {
+router.post(
+  '/teams',
+  protect,
+  rateLimitByUser(3, 24 * 60 * 60 * 1000),
+  [
+    body('name').trim().isLength({ min: 3, max: 50 }).withMessage('Name must be 3-50 characters'),
+    body('description').optional().trim().isLength({ max: 500 }),
+    body('category')
+      .isIn(['health', 'wealth', 'insurance', 'wellness', 'mixed', 'corporate', 'community'])
+      .withMessage('Invalid category'),
+    body('type').optional().isIn(['public', 'private', 'invite-only', 'corporate']),
+    body('maxMembers').optional().isInt({ min: 2, max: 500 }).toInt()
+  ],
+  async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Validation failed', errors: errors.array() });
     }
 
-    // Check if user is already captain of another team
-    const existingTeam = await Team.findOne({ 
-      captain: req.user._id, 
-      isActive: true 
-    });
-
-    if (existingTeam) {
-      return res.status(400).json({
-        success: false,
-        message: 'You can only be captain of one team at a time'
-      });
-    }
-
-    const teamData = {
-      ...req.body,
-      captain: req.user._id,
-      members: [req.user._id],
-      stats: {
-        totalMembers: 1,
-        totalPoints: 0,
-        activeChallenges: 0,
-        completedChallenges: 0
+    try {
+      const alreadyCreated = await Team.findOne({ creator: req.user._id, isActive: true });
+      if (alreadyCreated) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'You already run a team' });
       }
-    };
 
-    const team = await Team.create(teamData);
-    await team.populate('captain', 'username firstName lastName avatar level');
+      const team = await Team.create({
+        name: req.body.name,
+        description: req.body.description,
+        category: req.body.category,
+        type: req.body.type || 'public',
+        maxMembers: req.body.maxMembers,
+        creator: req.user._id,
+        leaders: [{ userId: req.user._id, role: 'captain' }],
+        members: [{ userId: req.user._id, status: 'active' }]
+      });
 
-    // Update user's team membership
-    await User.findByIdAndUpdate(req.user._id, {
-      $set: { currentTeam: team._id }
-    });
+      await User.findByIdAndUpdate(req.user._id, {
+        $push: { teams: { teamId: team._id, role: 'captain' } }
+      });
 
-    logger.info(`Team created by ${req.user.username}: ${team.name}`);
+      logger.info(`Team created by ${req.user.username}: ${team.name}`);
 
-    res.status(201).json({
-      success: true,
-      message: 'Team created successfully',
-      data: team
-    });
-  } catch (error) {
-    next(error);
+      res.status(201).json({ success: true, message: 'Team created', data: team });
+    } catch (error) {
+      if (error.code === 11000) {
+        return res.status(400).json({ success: false, message: 'That team name is taken' });
+      }
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      next(error);
+    }
   }
-});
+);
 
 /**
  * @swagger
  * /api/community/teams/{id}/join:
  *   post:
- *     summary: Join a team
+ *     summary: Join a public team
  *     tags: [Community]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Team ID
- *     responses:
- *       200:
- *         description: Successfully joined team
  */
 router.post('/teams/:id/join', protect, validateResource(Team), async (req, res, next) => {
   try {
     const team = req.resource;
     const user = req.user;
 
-    // Check if user is already in a team
-    if (user.currentTeam) {
-      return res.status(400).json({
-        success: false,
-        message: 'You are already a member of another team'
-      });
+    const activeMembers = team.members.filter((m) => m.status === 'active');
+
+    if (activeMembers.some((m) => m.userId.toString() === user._id.toString())) {
+      return res.status(400).json({ success: false, message: 'You are already in this team' });
     }
 
-    // Check if team is full
-    if (team.members.length >= team.maxMembers) {
-      return res.status(400).json({
-        success: false,
-        message: 'Team is full'
-      });
+    if (activeMembers.length >= team.maxMembers) {
+      return res.status(400).json({ success: false, message: 'Team is full' });
     }
 
-    // Check if team is public or user was invited
-    if (!team.isPublic && !team.invitedUsers.includes(user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'This team is private and requires an invitation'
-      });
+    if (team.type !== 'public') {
+      return res
+        .status(403)
+        .json({ success: false, message: 'This team is not open to join requests' });
     }
 
-    // Add user to team
-    await team.addMember(user._id);
+    team.members.push({ userId: user._id, status: 'active' });
+    await team.save();
 
-    // Update user's team membership
     await User.findByIdAndUpdate(user._id, {
-      $set: { currentTeam: team._id }
+      $push: { teams: { teamId: team._id, role: 'member' } }
     });
 
-    // Emit real-time update
     const io = req.app.get('io');
     if (io) {
       io.to(`team-${team._id}`).emit('member-joined', {
+        teamId: team._id,
         userId: user._id,
-        username: user.username,
-        avatar: user.avatar,
-        level: user.level,
-        totalMembers: team.members.length + 1
+        username: user.username
       });
     }
 
-    logger.info(`User ${user.username} joined team: ${team.name}`);
+    logger.info(`${user.username} joined team ${team.name}`);
 
-    res.status(200).json({
-      success: true,
-      message: 'Successfully joined team',
-      data: {
-        teamId: team._id,
-        teamName: team.name,
-        memberCount: team.members.length + 1
-      }
-    });
+    res.status(200).json({ success: true, message: 'Joined team', data: { team } });
   } catch (error) {
     next(error);
   }
@@ -385,11 +292,12 @@ router.get('/leaderboard', async (req, res, next) => {
       case 'daily':
         startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         break;
-      case 'weekly':
+      case 'weekly': {
         const weekStart = new Date(now);
         weekStart.setDate(now.getDate() - now.getDay());
         startDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
         break;
+      }
       case 'monthly':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
@@ -401,7 +309,7 @@ router.get('/leaderboard', async (req, res, next) => {
 
     if (type === 'teams') {
       // Team leaderboard
-      let query = { isActive: true };
+      const query = { isActive: true };
       
       if (startDate) {
         query.updatedAt = { $gte: startDate };
@@ -414,22 +322,14 @@ router.get('/leaderboard', async (req, res, next) => {
         .limit(parseInt(limit))
         .select('name description category stats captain members createdAt');
     } else {
-      // User leaderboard
-      let sortField = 'totalPoints';
-      let query = { isActive: true };
-
-      if (period === 'daily') {
-        sortField = 'dailyPoints';
-      } else if (period === 'weekly') {
-        sortField = 'weeklyPoints';
-      } else if (period === 'monthly') {
-        sortField = 'monthlyPoints';
-      }
-
-      leaderboard = await User.find(query)
-        .sort({ [sortField]: -1 })
+      // User leaderboard. Always ranked by totalPoints: the User schema keeps no
+      // per-period point buckets, and sorting by a field that does not exist
+      // returns an arbitrary order rather than an error. Period-scoped user
+      // rankings need per-period totals to be tracked first.
+      leaderboard = await User.find({ isActive: true })
+        .sort({ totalPoints: -1 })
         .limit(parseInt(limit))
-        .select('username firstName lastName avatar level totalPoints dailyPoints weeklyPoints monthlyPoints createdAt');
+        .select('username firstName lastName avatar level totalPoints createdAt');
     }
 
     res.status(200).json({

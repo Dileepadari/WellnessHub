@@ -1,9 +1,9 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Challenge = require('../models/Challenge');
-const Team = require('../models/Team');
 const User = require('../models/User');
 const { protect, rateLimitByUser, validateResource } = require('../middleware/auth');
+const { progressFor, syncParticipant } = require('../services/challenges');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -55,7 +55,7 @@ router.get('/', async (req, res, next) => {
       limit = 20 
     } = req.query;
 
-    let query = { 
+    const query = { 
       isActive: true, 
       isPublic: true,
       status
@@ -75,6 +75,114 @@ router.get('/', async (req, res, next) => {
       success: true,
       data: challenges
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/*
+ * Static paths must be declared before the /:id route below. Express matches
+ * in order, so /trending, /featured and /mine would otherwise be swallowed by
+ * /:id and rejected as an invalid challenge id.
+ */
+
+/**
+ * @swagger
+ * /api/challenges/trending:
+ *   get:
+ *     summary: Get trending challenges
+ *     tags: [Challenges]
+ *     responses:
+ *       200:
+ *         description: Trending challenges retrieved successfully
+ */
+router.get('/trending', async (req, res, next) => {
+  try {
+    const trendingChallenges = await Challenge.getTrending(10);
+
+    res.status(200).json({
+      success: true,
+      data: trendingChallenges
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/challenges/featured:
+ *   get:
+ *     summary: Get featured challenges
+ *     tags: [Challenges]
+ *     responses:
+ *       200:
+ *         description: Featured challenges retrieved successfully
+ */
+router.get('/featured', async (req, res, next) => {
+  try {
+    const featuredChallenges = await Challenge.getFeatured(5);
+
+    res.status(200).json({
+      success: true,
+      data: featuredChallenges
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/challenges/mine:
+ *   get:
+ *     summary: The user's joined challenges with measured progress
+ *     tags: [Challenges]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Joined challenges, each with progress measured from the activity log
+ */
+router.get('/mine', protect, async (req, res, next) => {
+  try {
+    const ids = (req.user.activeChallenges || [])
+      .map((entry) => entry.challengeId)
+      .filter(Boolean);
+
+    if (ids.length === 0) {
+      return res.status(200).json({ success: true, data: { challenges: [] } });
+    }
+
+    const challenges = await Challenge.find({ _id: { $in: ids } });
+
+    const rows = await Promise.all(
+      challenges.map(async (challenge) => {
+        const participant = challenge.participants.find(
+          (p) => p.userId.toString() === req.user._id.toString()
+        );
+        const progress = await progressFor(req.user, challenge, participant);
+
+        return {
+          _id: challenge._id,
+          title: challenge.title,
+          category: challenge.category,
+          difficulty: challenge.difficulty,
+          points: challenge.points,
+          startDate: challenge.startDate,
+          endDate: challenge.endDate,
+          target: challenge.target,
+          joinedAt: participant?.joinedAt ?? null,
+          completed: participant?.completed ?? false,
+          progress
+        };
+      })
+    );
+
+    // Unfinished first, then closest to done.
+    rows.sort((a, b) => Number(a.completed) - Number(b.completed) || b.progress.percent - a.progress.percent);
+
+    res.status(200).json({ success: true, data: { challenges: rows } });
   } catch (error) {
     next(error);
   }
@@ -288,6 +396,11 @@ router.post('/:id/join', protect, validateResource(Challenge), async (req, res, 
       $push: { activeChallenges: userChallengeData }
     });
 
+    // Measure straight away: activity already logged inside the challenge window
+    // counts, so a fresh participant is rarely at exactly zero.
+    const fresh = await User.findById(user._id);
+    await syncParticipant(fresh, challenge, { award: false });
+
     // Emit real-time update
     const io = req.app.get('io');
     if (io) {
@@ -495,50 +608,7 @@ router.get('/:id/leaderboard', validateResource(Challenge), async (req, res, nex
   }
 });
 
-/**
- * @swagger
- * /api/challenges/trending:
- *   get:
- *     summary: Get trending challenges
- *     tags: [Challenges]
- *     responses:
- *       200:
- *         description: Trending challenges retrieved successfully
- */
-router.get('/trending', async (req, res, next) => {
-  try {
-    const trendingChallenges = await Challenge.getTrending(10);
 
-    res.status(200).json({
-      success: true,
-      data: trendingChallenges
-    });
-  } catch (error) {
-    next(error);
-  }
-});
 
-/**
- * @swagger
- * /api/challenges/featured:
- *   get:
- *     summary: Get featured challenges
- *     tags: [Challenges]
- *     responses:
- *       200:
- *         description: Featured challenges retrieved successfully
- */
-router.get('/featured', async (req, res, next) => {
-  try {
-    const featuredChallenges = await Challenge.getFeatured(5);
-
-    res.status(200).json({
-      success: true,
-      data: featuredChallenges
-    });
-  } catch (error) {
-    next(error);
-  }
-});
 
 module.exports = router;
