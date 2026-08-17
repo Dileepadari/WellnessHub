@@ -2,7 +2,6 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
-const Challenge = require('../models/Challenge');
 const { protect, rateLimitByUser } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
@@ -164,7 +163,7 @@ router.get('/achievements', async (req, res, next) => {
   try {
     const { category, rarity, unlocked } = req.query;
     
-    let query = { isActive: true, isPublic: true };
+    const query = { isActive: true, isPublic: true };
     
     if (category) {
       query.category = category;

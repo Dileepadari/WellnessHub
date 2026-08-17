@@ -1,9 +1,10 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Achievement = require('../models/Achievement');
+const config = require('../config/env');
+const { protect } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -72,8 +73,8 @@ const router = express.Router();
 
 // Generate JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d',
+  return jwt.sign({ id }, config.jwtSecret, {
+    expiresIn: config.jwtExpire,
   });
 };
 
@@ -319,56 +320,21 @@ router.post('/login', [
  *       401:
  *         description: Not authorized
  */
-router.get('/me', async (req, res, next) => {
+// `protect` owns token verification and the deactivated-account check. Doing it
+// inline here previously reported every failure as 'Invalid token', which hid
+// real errors behind a 401.
+router.get('/me', protect, async (req, res, next) => {
   try {
-    // Get token from header
-    let token;
-    
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
-    }
+    const user = await User.findById(req.user._id)
+      .populate('achievements.achievementId', 'title description icon points rarity')
+      .populate('teams.teamId', 'name avatar category')
+      .populate('activeChallenges.challengeId', 'title category points endDate');
 
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to access this route'
-      });
-    }
-
-    try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Get user from database
-      const user = await User.findById(decoded.id)
-        .populate('achievements.achievementId', 'title description icon points rarity')
-        .populate('teams.teamId', 'name avatar category')
-        .populate('activeChallenges.challengeId', 'title category points endDate');
-
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'No user found with this token'
-        });
-      }
-
-      if (!user.isActive) {
-        return res.status(401).json({
-          success: false,
-          message: 'User account is deactivated'
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        data: user
-      });
-    } catch (tokenError) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
+    // Nested under `user` to match the register and login responses.
+    res.status(200).json({
+      success: true,
+      data: { user }
+    });
   } catch (error) {
     next(error);
   }
@@ -447,7 +413,7 @@ router.post('/forgot-password', [
     // Generate reset token (in production, this would be saved to user and sent via email)
     const resetToken = jwt.sign(
       { id: user._id, purpose: 'password-reset' },
-      process.env.JWT_SECRET,
+      config.jwtSecret,
       { expiresIn: '10m' }
     );
 
@@ -460,7 +426,7 @@ router.post('/forgot-password', [
       success: true,
       message: 'Password reset instructions sent to email',
       // In production, don't send token in response
-      ...(process.env.NODE_ENV === 'development' && { resetToken })
+      ...(config.isDevelopment && { resetToken })
     });
   } catch (error) {
     next(error);
@@ -515,7 +481,7 @@ router.post('/reset-password', [
     const { token, password } = req.body;
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, config.jwtSecret);
       
       if (decoded.purpose !== 'password-reset') {
         return res.status(400).json({
@@ -585,7 +551,7 @@ router.post('/reset-password', [
  *       401:
  *         description: Not authorized
  */
-router.post('/change-password', [
+router.post('/change-password', protect, [
   body('currentPassword')
     .notEmpty()
     .withMessage('Current password is required'),
@@ -594,23 +560,7 @@ router.post('/change-password', [
     .withMessage('New password must be at least 6 characters long')
 ], async (req, res, next) => {
   try {
-    // This would need the auth middleware in production
-    // For now, implement inline token verification
-    let token;
-    
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
-    }
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to access this route'
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('+password');
+    const user = await User.findById(req.user._id).select('+password');
 
     if (!user) {
       return res.status(401).json({

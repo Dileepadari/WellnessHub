@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const config = require('../config/env');
 const logger = require('../utils/logger');
 
 // Protect routes - require authentication
@@ -21,7 +22,7 @@ const protect = async (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, config.jwtSecret);
 
     // Get user from token
     const user = await User.findById(decoded.id).select('-password');
@@ -73,35 +74,6 @@ const authorize = (...roles) => {
   };
 };
 
-// Optional auth - user may or may not be authenticated
-const optionalAuth = async (req, res, next) => {
-  let token;
-
-  // Get token from header
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-
-  if (token) {
-    try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Get user from token
-      const user = await User.findById(decoded.id).select('-password');
-
-      if (user && user.isActive) {
-        req.user = user;
-      }
-    } catch (error) {
-      // Token invalid, but continue without user
-      logger.debug('Optional auth failed:', error.message);
-    }
-  }
-
-  next();
-};
-
 // Rate limiting for specific actions
 const rateLimitByUser = (maxRequests = 10, windowMs = 15 * 60 * 1000) => {
   const userRequests = new Map();
@@ -135,75 +107,6 @@ const rateLimitByUser = (maxRequests = 10, windowMs = 15 * 60 * 1000) => {
 
     userRequestList.push(now);
     next();
-  };
-};
-
-// Middleware to check if user owns resource
-const checkOwnership = (Model, paramName = 'id', userField = 'userId') => {
-  return async (req, res, next) => {
-    try {
-      const resourceId = req.params[paramName];
-      const resource = await Model.findById(resourceId);
-
-      if (!resource) {
-        return res.status(404).json({
-          success: false,
-          message: 'Resource not found'
-        });
-      }
-
-      // Check if user owns the resource
-      const resourceUserId = resource[userField]?.toString() || resource.createdBy?.toString();
-      const currentUserId = req.user._id.toString();
-
-      if (resourceUserId !== currentUserId) {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to access this resource'
-        });
-      }
-
-      req.resource = resource;
-      next();
-    } catch (error) {
-      logger.error('Ownership check error:', error.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Error checking resource ownership'
-      });
-    }
-  };
-};
-
-// Middleware to check team membership
-const checkTeamMembership = (allowedRoles = ['member', 'captain', 'admin']) => {
-  return async (req, res, next) => {
-    try {
-      const teamId = req.params.teamId;
-      const user = req.user;
-
-      // Check if user is member of the team
-      const teamMembership = user.teams.find(
-        team => team.teamId.toString() === teamId && 
-        allowedRoles.includes(team.role)
-      );
-
-      if (!teamMembership) {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to access this team resource'
-        });
-      }
-
-      req.teamMembership = teamMembership;
-      next();
-    } catch (error) {
-      logger.error('Team membership check error:', error.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Error checking team membership'
-      });
-    }
   };
 };
 
@@ -243,9 +146,6 @@ const validateResource = (Model, paramName = 'id') => {
 module.exports = {
   protect,
   authorize,
-  optionalAuth,
   rateLimitByUser,
-  checkOwnership,
-  checkTeamMembership,
   validateResource
 };

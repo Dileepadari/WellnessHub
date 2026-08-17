@@ -1,204 +1,180 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
+const { body, query, validationResult } = require('express-validator');
+const Activity = require('../models/Activity');
 const User = require('../models/User');
+const { METRIC_TYPES, pointsFor, publicMetrics } = require('../models/metrics');
 const { protect, rateLimitByUser } = require('../middleware/auth');
+const healthService = require('../services/health');
+const { recompute } = require('../services/progression');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
+const rejectInvalid = (req, res) => {
+  const errors = validationResult(req);
+  if (errors.isEmpty()) return false;
+  res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+  return true;
+};
+
 /**
  * @swagger
- * /api/health/activities:
- *   post:
- *     summary: Log health activity
+ * /api/health/metrics:
+ *   get:
+ *     summary: Metric definitions the client renders columns from
  *     tags: [Health]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - type
- *               - value
- *             properties:
- *               type:
- *                 type: string
- *                 enum: [steps, water, workout, weight, sleep]
- *               value:
- *                 type: number
- *               duration:
- *                 type: number
- *               notes:
- *                 type: string
  *     responses:
  *       200:
- *         description: Activity logged successfully
+ *         description: Metric definitions
  */
-router.post('/activities', protect, rateLimitByUser(100, 15 * 60 * 1000), [
-  body('type')
-    .isIn(['steps', 'water', 'workout', 'weight', 'sleep'])
-    .withMessage('Invalid activity type'),
-  body('value')
-    .isNumeric()
-    .withMessage('Value must be a number'),
-  body('duration')
-    .optional()
-    .isNumeric()
-    .withMessage('Duration must be a number'),
-  body('notes')
-    .optional()
-    .trim()
-    .isLength({ max: 500 })
-    .withMessage('Notes cannot exceed 500 characters')
-], async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const { type, value, duration, notes } = req.body;
-    const user = req.user;
-
-    // Calculate points based on activity type
-    let points = 0;
-    let reason = '';
-
-    switch (type) {
-      case 'steps':
-        points = Math.floor(value / 1000) * 10; // 10 points per 1000 steps
-        reason = `Logged ${value} steps`;
-        break;
-      case 'water':
-        points = value * 5; // 5 points per glass
-        reason = `Drank ${value} glasses of water`;
-        break;
-      case 'workout':
-        points = Math.floor(duration / 10) * 15; // 15 points per 10 minutes
-        reason = `Workout for ${duration} minutes`;
-        break;
-      case 'weight':
-        points = 25; // Fixed points for weight logging
-        reason = `Logged weight: ${value}kg`;
-        break;
-      case 'sleep':
-        points = value >= 7 ? 50 : 25; // Bonus for good sleep
-        reason = `Logged ${value} hours of sleep`;
-        break;
-    }
-
-    // Cap points to prevent abuse
-    points = Math.min(points, 200);
-
-    if (points > 0) {
-      await user.addPoints(points, reason);
-    }
-
-    // Emit real-time update
-    const io = req.app.get('io');
-    if (io) {
-      io.to(`user-${user._id}`).emit('health-activity-logged', {
-        type,
-        value,
-        duration,
-        points,
-        totalPoints: user.totalPoints
-      });
-    }
-
-    logger.info(`Health activity logged by ${user.username}: ${type} - ${value}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Activity logged successfully',
-      data: {
-        type,
-        value,
-        duration,
-        notes,
-        pointsEarned: points,
-        totalPoints: user.totalPoints
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
+router.get('/metrics', (req, res) => {
+  res.status(200).json({ success: true, data: { metrics: publicMetrics() } });
 });
 
 /**
  * @swagger
- * /api/health/stats:
+ * /api/health/summary:
  *   get:
- *     summary: Get user health statistics
+ *     summary: Current figure, goal and daily series for every metric
  *     tags: [Health]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: timeframe
- *         schema:
- *           type: string
- *           enum: [daily, weekly, monthly]
- *         description: Statistics timeframe
+ *         name: days
+ *         schema: { type: integer, minimum: 1, maximum: 90 }
  *     responses:
  *       200:
- *         description: Health statistics retrieved successfully
+ *         description: Health summary aggregated from logged activities
  */
-router.get('/stats', protect, async (req, res, next) => {
+router.get(
+  '/summary',
+  protect,
+  [query('days').optional().isInt({ min: 1, max: 90 }).toInt()],
+  async (req, res, next) => {
+    if (rejectInvalid(req, res)) return;
+    try {
+      const data = await healthService.summary(req.user, req.query.days || 7);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/health/activities:
+ *   get:
+ *     summary: Recent logged activities
+ *     tags: [Health]
+ *     security:
+ *       - bearerAuth: []
+ *   post:
+ *     summary: Log an activity
+ *     tags: [Health]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  '/activities',
+  protect,
+  [query('limit').optional().isInt({ min: 1, max: 200 }).toInt()],
+  async (req, res, next) => {
+    if (rejectInvalid(req, res)) return;
+    try {
+      const entries = await healthService.recentEntries(req.user._id, req.query.limit || 25);
+      res.status(200).json({ success: true, data: { entries } });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
+  '/activities',
+  protect,
+  rateLimitByUser(120, 15 * 60 * 1000),
+  [
+    body('type').isIn(METRIC_TYPES).withMessage(`Type must be one of: ${METRIC_TYPES.join(', ')}`),
+    body('value').isFloat({ min: 0 }).withMessage('Value must be a positive number').toFloat(),
+    body('at').optional().isISO8601().withMessage('Provide a valid date').toDate(),
+    body('notes').optional().trim().isLength({ max: 280 })
+  ],
+  async (req, res, next) => {
+    if (rejectInvalid(req, res)) return;
+    try {
+      const { type, value, at, notes } = req.body;
+      const happenedAt = at || new Date();
+
+      // A future-dated entry would corrupt today's totals and the streak.
+      if (happenedAt > new Date()) {
+        return res.status(400).json({ success: false, message: 'Cannot log an activity in the future' });
+      }
+
+      const pointsEarned = pointsFor(type, value);
+
+      const activity = await Activity.create({
+        user: req.user._id,
+        type,
+        value,
+        at: happenedAt,
+        day: Activity.toDayKey(happenedAt),
+        notes,
+        pointsEarned
+      });
+
+      if (pointsEarned > 0) {
+        await req.user.addPoints(pointsEarned, `Logged ${type}`);
+      }
+      req.user.lastActivityDate = happenedAt;
+
+      // One hook fans out to challenge progress, achievements and streaks, and
+      // pushes the result over the socket.
+      const progression = await recompute(req.user, { io: req.app.get('io') });
+
+      logger.debug(`${req.user.username} logged ${value} ${type}`);
+
+      res.status(201).json({
+        success: true,
+        message: 'Activity logged',
+        data: {
+          activity,
+          pointsEarned,
+          streaks: progression.streaks,
+          challengesCompleted: progression.challengesCompleted,
+          achievementsUnlocked: progression.achievementsUnlocked
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/health/activities/{id}:
+ *   delete:
+ *     summary: Delete a logged activity
+ *     tags: [Health]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.delete('/activities/:id', protect, async (req, res, next) => {
   try {
-    const { timeframe = 'weekly' } = req.query;
-    const user = req.user;
+    // Scoped by user, so one account cannot delete another's entries.
+    const activity = await Activity.findOneAndDelete({ _id: req.params.id, user: req.user._id });
 
-    // Mock health statistics - in production, this would come from activity logs
-    const stats = {
-      steps: {
-        today: 8247,
-        goal: user.healthMetrics?.dailyStepGoal || 10000,
-        average7Days: 7850,
-        streak: 5
-      },
-      water: {
-        today: 6,
-        goal: user.healthMetrics?.dailyWaterGoal || 8,
-        average7Days: 7.2,
-        streak: 3
-      },
-      workouts: {
-        thisWeek: 4,
-        goal: user.healthMetrics?.weeklyWorkoutGoal || 5,
-        totalMinutes: 180,
-        averageIntensity: 'moderate'
-      },
-      weight: {
-        current: user.healthMetrics?.weight,
-        target: user.healthMetrics?.targetWeight,
-        change7Days: -0.5,
-        trend: 'decreasing'
-      },
-      overall: {
-        healthScore: 85,
-        weeklyProgress: 78,
-        achievements: user.achievements.filter(a => 
-          a.achievementId.category === 'health'
-        ).length
-      }
-    };
+    if (!activity) {
+      return res.status(404).json({ success: false, message: 'Activity not found' });
+    }
 
-    res.status(200).json({
-      success: true,
-      data: {
-        timeframe,
-        stats
-      }
-    });
+    res.status(200).json({ success: true, message: 'Activity deleted', data: { activity } });
   } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, message: 'Invalid activity id' });
+    }
     next(error);
   }
 });
@@ -207,82 +183,56 @@ router.get('/stats', protect, async (req, res, next) => {
  * @swagger
  * /api/health/goals:
  *   put:
- *     summary: Update health goals
+ *     summary: Update daily and weekly health goals
  *     tags: [Health]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               dailyStepGoal:
- *                 type: number
- *               dailyWaterGoal:
- *                 type: number
- *               weeklyWorkoutGoal:
- *                 type: number
- *               targetWeight:
- *                 type: number
- *     responses:
- *       200:
- *         description: Goals updated successfully
  */
-router.put('/goals', protect, [
-  body('dailyStepGoal')
-    .optional()
-    .isInt({ min: 1000, max: 50000 })
-    .withMessage('Daily step goal must be between 1000 and 50000'),
-  body('dailyWaterGoal')
-    .optional()
-    .isInt({ min: 1, max: 20 })
-    .withMessage('Daily water goal must be between 1 and 20 glasses'),
-  body('weeklyWorkoutGoal')
-    .optional()
-    .isInt({ min: 1, max: 14 })
-    .withMessage('Weekly workout goal must be between 1 and 14 sessions'),
-  body('targetWeight')
-    .optional()
-    .isFloat({ min: 30, max: 300 })
-    .withMessage('Target weight must be between 30 and 300 kg')
-], async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
+router.put(
+  '/goals',
+  protect,
+  [
+    body('dailyStepGoal').optional().isInt({ min: 1, max: 100000 }).toInt(),
+    body('dailyWaterGoal').optional().isInt({ min: 1, max: 40 }).toInt(),
+    body('weeklyWorkoutMinuteGoal').optional().isInt({ min: 1, max: 5000 }).toInt(),
+    body('dailySleepGoal').optional().isFloat({ min: 1, max: 24 }).toFloat(),
+    body('dailyMeditationGoal').optional().isInt({ min: 1, max: 600 }).toInt(),
+    body('targetWeight').optional().isFloat({ min: 1, max: 500 }).toFloat()
+  ],
+  async (req, res, next) => {
+    if (rejectInvalid(req, res)) return;
+    try {
+      const allowed = [
+        'dailyStepGoal',
+        'dailyWaterGoal',
+        'weeklyWorkoutMinuteGoal',
+        'dailySleepGoal',
+        'dailyMeditationGoal',
+        'targetWeight'
+      ];
 
-    const updates = {};
-    const allowedFields = ['dailyStepGoal', 'dailyWaterGoal', 'weeklyWorkoutGoal', 'targetWeight'];
-    
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        updates[`healthMetrics.${field}`] = req.body[field];
+      const updates = {};
+      for (const field of allowed) {
+        if (req.body[field] !== undefined) {
+          updates[`healthMetrics.${field}`] = req.body[field];
+        }
       }
-    });
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      updates,
-      { new: true, runValidators: true }
-    );
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ success: false, message: 'No goal fields supplied' });
+      }
 
-    logger.info(`Health goals updated for user ${user.username}`);
+      const user = await User.findByIdAndUpdate(req.user._id, { $set: updates }, { new: true });
 
-    res.status(200).json({
-      success: true,
-      message: 'Health goals updated successfully',
-      data: user.healthMetrics
-    });
-  } catch (error) {
-    next(error);
+      res.status(200).json({
+        success: true,
+        message: 'Goals updated',
+        data: { healthMetrics: user.healthMetrics }
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 module.exports = router;

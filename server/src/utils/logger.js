@@ -1,67 +1,72 @@
 const fs = require('fs');
 const path = require('path');
+const config = require('../config/env');
 
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
+const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const COLOURS = { error: '\x1b[31m', warn: '\x1b[33m', info: '\x1b[36m', debug: '\x1b[35m' };
+const RESET = '\x1b[0m';
 
-// Simple logger with different levels
 class Logger {
   constructor() {
-    this.logFile = path.join(logsDir, 'app.log');
-    this.errorFile = path.join(logsDir, 'error.log');
+    this.threshold = LEVELS[config.logLevel] ?? LEVELS.info;
+    // File logging is opt-out: containers that mount a read-only filesystem, and
+    // the test run, keep everything on stdout instead.
+    this.fileLogging = !config.isTest && this.ensureLogDir();
   }
 
-  formatMessage(level, message, data = null) {
-    const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
-    
-    if (data) {
-      return `${logMessage}\n${JSON.stringify(data, null, 2)}\n`;
-    }
-    
-    return `${logMessage}\n`;
-  }
-
-  writeToFile(filename, message) {
-    if (process.env.NODE_ENV !== 'test') {
-      fs.appendFileSync(filename, message);
+  ensureLogDir() {
+    try {
+      fs.mkdirSync(config.logDir, { recursive: true });
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  info(message, data = null) {
-    const formattedMessage = this.formatMessage('info', message, data);
-    console.log(`\x1b[36m${formattedMessage.trim()}\x1b[0m`); // Cyan
-    this.writeToFile(this.logFile, formattedMessage);
-  }
-
-  warn(message, data = null) {
-    const formattedMessage = this.formatMessage('warn', message, data);
-    console.warn(`\x1b[33m${formattedMessage.trim()}\x1b[0m`); // Yellow
-    this.writeToFile(this.logFile, formattedMessage);
-  }
-
-  error(message, data = null) {
-    const formattedMessage = this.formatMessage('error', message, data);
-    console.error(`\x1b[31m${formattedMessage.trim()}\x1b[0m`); // Red
-    this.writeToFile(this.errorFile, formattedMessage);
-    this.writeToFile(this.logFile, formattedMessage);
-  }
-
-  debug(message, data = null) {
-    if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
-      const formattedMessage = this.formatMessage('debug', message, data);
-      console.debug(`\x1b[35m${formattedMessage.trim()}\x1b[0m`); // Magenta
-      this.writeToFile(this.logFile, formattedMessage);
+  format(level, message, data) {
+    const line = `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}`;
+    if (data === undefined || data === null) return line;
+    if (data instanceof Error) return `${line}\n${data.stack}`;
+    try {
+      return `${line}\n${JSON.stringify(data, null, 2)}`;
+    } catch {
+      return `${line}\n[unserialisable payload]`;
     }
   }
 
-  success(message, data = null) {
-    const formattedMessage = this.formatMessage('success', message, data);
-    console.log(`\x1b[32m${formattedMessage.trim()}\x1b[0m`); // Green
-    this.writeToFile(this.logFile, formattedMessage);
+  write(level, message, data) {
+    if (LEVELS[level] > this.threshold) return;
+
+    const line = this.format(level, message, data);
+    const stream = level === 'error' || level === 'warn' ? console.error : console.log;
+    stream(`${COLOURS[level]}${line}${RESET}`);
+
+    if (!this.fileLogging) return;
+    try {
+      fs.appendFileSync(path.join(config.logDir, 'app.log'), `${line}\n`);
+      if (level === 'error') {
+        fs.appendFileSync(path.join(config.logDir, 'error.log'), `${line}\n`);
+      }
+    } catch {
+      // A logger that throws is worse than a logger that misses a line.
+      this.fileLogging = false;
+    }
+  }
+
+  error(message, data) {
+    this.write('error', message, data);
+  }
+
+  warn(message, data) {
+    this.write('warn', message, data);
+  }
+
+  info(message, data) {
+    this.write('info', message, data);
+  }
+
+  debug(message, data) {
+    this.write('debug', message, data);
   }
 }
 

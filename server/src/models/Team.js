@@ -337,8 +337,8 @@ const teamSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes for performance
-teamSchema.index({ name: 1 });
+// Indexes for performance. name is already indexed by its `unique: true`
+// field option - repeating it here would define it twice.
 teamSchema.index({ category: 1, type: 1 });
 teamSchema.index({ 'stats.totalPoints': -1 });
 teamSchema.index({ isFeatured: -1, createdAt: -1 });
@@ -346,25 +346,29 @@ teamSchema.index({ 'location.country': 1, 'location.state': 1 });
 teamSchema.index({ creator: 1 });
 teamSchema.index({ tags: 1 });
 
+// Virtuals run during toJSON, including on documents loaded by a populate()
+// projection that omitted these arrays - hence the `|| []` guards. Without them
+// serialising such a document throws, and the caller sees an unrelated error.
+
 // Virtual for member count
 teamSchema.virtual('memberCount').get(function() {
-  return this.members.filter(m => m.status === 'active').length;
+  return (this.members || []).filter(m => m.status === 'active').length;
 });
 
 // Virtual for active member count
 teamSchema.virtual('activeMemberCount').get(function() {
   // Members active in last 7 days (this would need more complex logic)
-  return this.members.filter(m => m.status === 'active').length;
+  return (this.members || []).filter(m => m.status === 'active').length;
 });
 
 // Virtual for join request count
 teamSchema.virtual('pendingRequestCount').get(function() {
-  return this.joinRequests.filter(r => r.status === 'pending').length;
+  return (this.joinRequests || []).filter(r => r.status === 'pending').length;
 });
 
 // Virtual for team level (based on total points)
 teamSchema.virtual('level').get(function() {
-  return Math.floor(this.stats.totalPoints / 10000) + 1; // 10k points per level
+  return Math.floor((this.stats?.totalPoints || 0) / 10000) + 1; // 10k points per level
 });
 
 // Pre-save middleware to update stats
@@ -438,9 +442,7 @@ teamSchema.methods.removeMember = function(userId, reason = 'left') {
   }
   
   // Check if removing creator/last leader
-  const member = this.members[memberIndex];
   const isCreator = this.creator.toString() === userId.toString();
-  const isLeader = this.leaders.some(l => l.userId.toString() === userId.toString());
   
   if (isCreator) {
     // Transfer ownership to another leader or senior member

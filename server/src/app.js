@@ -1,20 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const morgan = require('morgan');
-const { createServer } = require('http');
-const { Server } = require('socket.io');
-require('dotenv').config();
+const { rateLimit } = require('express-rate-limit');
 
-// Import database connection
-const connectDB = require('./config/database');
-
-// Import middleware
+const config = require('./config/env');
+const swaggerSetup = require('./config/swagger');
 const errorHandler = require('./middleware/errorHandler');
+const logger = require('./utils/logger');
 
-// Import routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const gamificationRoutes = require('./routes/gamification');
@@ -25,290 +20,144 @@ const challengeRoutes = require('./routes/challenges');
 const communityRoutes = require('./routes/community');
 const analyticsRoutes = require('./routes/analytics');
 
-// Import utilities
-const logger = require('./utils/logger');
-const swaggerSetup = require('./config/swagger');
+/**
+ * Builds the Express application.
+ *
+ * This module deliberately does not listen, connect to the database, or install
+ * process-level handlers - see server.js for that. Keeping it side-effect free
+ * is what lets tests mount the app against an in-memory database.
+ */
+const createApp = () => {
+  const app = express();
 
-const app = express();
+  // Required for express-rate-limit and req.ip to see the real client address
+  // when running behind nginx or a platform load balancer.
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
 
-// Create HTTP server
-const server = createServer(app);
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+          imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com'],
+          scriptSrc: ["'self'"],
+          connectSrc: ["'self'", 'ws:', 'wss:']
+        }
+      },
+      crossOriginEmbedderPolicy: false
+    })
+  );
 
-// Initialize Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    methods: ["GET", "POST"],
-    credentials: true
-  },
-  transports: ['websocket', 'polling']
-});
+  app.use(
+    cors({
+      origin(origin, callback) {
+        // Requests with no Origin header (curl, server-to-server, mobile) are allowed.
+        if (!origin || config.corsOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    })
+  );
 
-// Make io available to routes
-app.set('io', io);
+  app.use(compression());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Connect to database
-connectDB();
+  // Express 5 leaves req.body undefined when a request carries no body, so any
+  // handler doing `const { x } = req.body` throws on a body-less POST. Several
+  // routes take an entirely optional body (joining a challenge, claiming the
+  // daily bonus), so normalise it once here rather than guarding 13 call sites.
+  app.use((req, res, next) => {
+    if (req.body === undefined) req.body = {};
+    next();
+  });
 
-// Trust proxy for rate limiting behind reverse proxy
-app.set('trust proxy', 1);
-
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "ws:", "wss:"]
-    }
-  },
-  crossOriginEmbedderPolicy: false
-}));
-
-// CORS middleware
-app.use(cors({
-  origin: function (origin, callback) {
-    const allowedOrigins = [
-      process.env.CLIENT_URL || 'http://localhost:3000',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://wellnesshub.app' // Production domain
-    ];
-    
-    // Allow requests with no origin (mobile apps, curl requests, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-
-// Compression middleware
-app.use(compression());
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
-} else {
-  app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
-}
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // Limit each IP to 100 requests per windowMs in production
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Skip rate limiting for health checks
-    return req.path === '/health' || req.path === '/api/health';
+  if (!config.isTest) {
+    app.use(
+      morgan(config.isProduction ? 'combined' : 'dev', {
+        stream: { write: (message) => logger.info(message.trim()) }
+      })
+    );
   }
-});
 
-app.use('/api', limiter);
+  // Liveness probe, registered before the rate limiter so a busy API cannot
+  // make an orchestrator think the process is dead.
+  app.get('/health', (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: 'WellnessHub API is healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: config.apiVersion,
+      environment: config.nodeEnv
+    });
+  });
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/gamification', gamificationRoutes);
-app.use('/api/health', healthRoutes);
-app.use('/api/wealth', wealthRoutes);
-app.use('/api/insurance', insuranceRoutes);
-app.use('/api/challenges', challengeRoutes);
-app.use('/api/community', communityRoutes);
-app.use('/api/analytics', analyticsRoutes);
+  app.use(
+    '/api',
+    rateLimit({
+      windowMs: config.rateLimit.windowMs,
+      max: config.rateLimit.max,
+      message: {
+        success: false,
+        message: 'Too many requests from this IP, please try again later.'
+      },
+      standardHeaders: true,
+      legacyHeaders: false
+    })
+  );
 
-// Setup Swagger documentation
-swaggerSetup(app);
+  app.get('/api', (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: 'WellnessHub API',
+      version: config.apiVersion,
+      documentation: '/api-docs',
+      endpoints: {
+        auth: '/api/auth',
+        users: '/api/users',
+        gamification: '/api/gamification',
+        health: '/api/health',
+        wealth: '/api/wealth',
+        insurance: '/api/insurance',
+        challenges: '/api/challenges',
+        community: '/api/community',
+        analytics: '/api/analytics'
+      }
+    });
+  });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'WellnessHub API is healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.API_VERSION || '1.0.0',
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
+  app.use('/api/auth', authRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/gamification', gamificationRoutes);
+  app.use('/api/health', healthRoutes);
+  app.use('/api/wealth', wealthRoutes);
+  app.use('/api/insurance', insuranceRoutes);
+  app.use('/api/challenges', challengeRoutes);
+  app.use('/api/community', communityRoutes);
+  app.use('/api/analytics', analyticsRoutes);
 
-// API documentation endpoint
-app.get('/api', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'WellnessHub API',
-    version: process.env.API_VERSION || '1.0.0',
-    documentation: '/api/docs',
-    endpoints: {
-      auth: '/api/auth',
-      users: '/api/users',
-      gamification: '/api/gamification',
-      health: '/api/health',
-      wealth: '/api/wealth',
-      insurance: '/api/insurance',
-      challenges: '/api/challenges',
-      community: '/api/community',
-      analytics: '/api/analytics'
-    }
-  });
-});
+  swaggerSetup(app);
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static('uploads'));
+  app.use((req, res) => {
+    res.status(404).json({
+      success: false,
+      message: 'Route not found',
+      path: req.originalUrl,
+      method: req.method
+    });
+  });
 
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  logger.info(`Socket connected: ${socket.id}`);
-  
-  // Handle user authentication for socket
-  socket.on('authenticate', (data) => {
-    if (data.userId) {
-      socket.join(`user-${data.userId}`);
-      logger.info(`User ${data.userId} joined their personal room`);
-    }
-  });
-  
-  // Handle joining challenge rooms
-  socket.on('join-challenge', (challengeId) => {
-    socket.join(`challenge-${challengeId}`);
-    logger.info(`Socket ${socket.id} joined challenge room: ${challengeId}`);
-  });
-  
-  // Handle joining team rooms
-  socket.on('join-team', (teamId) => {
-    socket.join(`team-${teamId}`);
-    logger.info(`Socket ${socket.id} joined team room: ${teamId}`);
-  });
-  
-  // Handle leaving rooms
-  socket.on('leave-challenge', (challengeId) => {
-    socket.leave(`challenge-${challengeId}`);
-    logger.info(`Socket ${socket.id} left challenge room: ${challengeId}`);
-  });
-  
-  socket.on('leave-team', (teamId) => {
-    socket.leave(`team-${teamId}`);
-    logger.info(`Socket ${socket.id} left team room: ${teamId}`);
-  });
-  
-  // Handle real-time activity updates
-  socket.on('activity-update', (data) => {
-    // Broadcast activity updates to followers/friends
-    if (data.userId && data.activity) {
-      socket.to(`user-${data.userId}`).emit('friend-activity', {
-        userId: data.userId,
-        activity: data.activity,
-        timestamp: new Date()
-      });
-    }
-  });
-  
-  // Handle typing indicators for team chat (future feature)
-  socket.on('typing-start', (data) => {
-    if (data.teamId) {
-      socket.to(`team-${data.teamId}`).emit('user-typing', {
-        userId: data.userId,
-        username: data.username
-      });
-    }
-  });
-  
-  socket.on('typing-stop', (data) => {
-    if (data.teamId) {
-      socket.to(`team-${data.teamId}`).emit('user-stopped-typing', {
-        userId: data.userId
-      });
-    }
-  });
-  
-  // Handle disconnection
-  socket.on('disconnect', (reason) => {
-    logger.info(`Socket disconnected: ${socket.id}, reason: ${reason}`);
-  });
-  
-  // Handle connection errors
-  socket.on('error', (error) => {
-    logger.error(`Socket error: ${error.message}`);
-  });
-});
+  app.use(errorHandler);
 
-// Handle 404 for API routes
-app.use(/^\/api\/.*/, (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'API endpoint not found',
-    path: req.path,
-    method: req.method
-  });
-});
+  return app;
+};
 
-// Global error handler
-app.use(errorHandler);
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Process terminated');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Process terminated');
-    process.exit(0);
-  });
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  logger.error('Unhandled Promise Rejection:', err);
-  server.close(() => {
-    process.exit(1);
-  });
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  logger.error('Uncaught Exception:', err);
-  server.close(() => {
-    process.exit(1);
-  });
-});
-
-const PORT = process.env.PORT || 5000;
-
-server.listen(PORT, () => {
-  logger.info(`
-🚀 WellnessHub API Server started successfully!
-📍 Environment: ${process.env.NODE_ENV || 'development'}
-🌐 Server: http://localhost:${PORT}
-📋 Health Check: http://localhost:${PORT}/health
-📚 API Docs: http://localhost:${PORT}/api
-⚡ Socket.IO: WebSocket server running
-📊 Database: ${process.env.MONGODB_URI ? 'Connected' : 'Local'}
-🔒 CORS Origin: ${process.env.CLIENT_URL || 'http://localhost:3000'}
-  `);
-});
-
-// Export for testing
-module.exports = { app, server, io };
+module.exports = createApp;

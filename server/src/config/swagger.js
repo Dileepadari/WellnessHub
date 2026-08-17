@@ -1,5 +1,6 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const config = require('./env');
 
 const options = {
   definition: {
@@ -19,10 +20,10 @@ const options = {
     },
     servers: [
       {
-        url: process.env.NODE_ENV === 'production' 
+        url: config.isProduction 
           ? 'https://api.wellnesshub.com/api' 
-          : `http://localhost:${process.env.PORT || 5000}/api`,
-        description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server'
+          : `http://localhost:${config.port}/api`,
+        description: config.isProduction ? 'Production server' : 'Development server'
       }
     ],
     components: {

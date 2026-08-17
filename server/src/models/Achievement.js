@@ -184,7 +184,8 @@ achievementSchema.index({ 'series.name': 1, 'series.order': 1 });
 achievementSchema.virtual('unlockPercentage').get(function() {
   // This would need to be calculated based on total users
   // For now, return a basic calculation
-  return this.stats.totalUnlocked > 0 ? Math.min(100, this.stats.totalUnlocked / 100) : 0;
+  const totalUnlocked = this.stats?.totalUnlocked || 0;
+  return totalUnlocked > 0 ? Math.min(100, totalUnlocked / 100) : 0;
 });
 
 // Virtual for difficulty score
@@ -205,7 +206,7 @@ achievementSchema.methods.checkCriteria = function(userStats) {
   const { target, operator, value, timeframe } = this.criteria;
   
   // Get the relevant stat from user
-  let userValue = userStats[target];
+  const userValue = userStats[target];
   
   if (userValue === undefined) {
     return false;
@@ -240,7 +241,7 @@ achievementSchema.methods.checkCriteria = function(userStats) {
 };
 
 // Method to update statistics when unlocked
-achievementSchema.methods.onUnlocked = function(userId) {
+achievementSchema.methods.onUnlocked = function() {
   this.stats.totalUnlocked += 1;
   
   if (!this.stats.firstUnlockedAt) {
@@ -312,13 +313,15 @@ achievementSchema.statics.checkAndUnlockForUser = async function(userId, userSta
   const availableAchievements = await this.find({
     _id: { $nin: unlockedAchievementIds },
     isActive: true,
-    $or: [
-      { availableFrom: { $exists: false } },
-      { availableFrom: { $lte: new Date() } }
-    ],
-    $or: [
-      { availableTo: { $exists: false } },
-      { availableTo: { $gte: new Date() } }
+    // Both window bounds must hold. Two sibling `$or` keys would silently
+    // collapse to the last one, so the availability window is built with $and.
+    $and: [
+      {
+        $or: [{ availableFrom: { $exists: false } }, { availableFrom: { $lte: new Date() } }]
+      },
+      {
+        $or: [{ availableTo: { $exists: false } }, { availableTo: { $gte: new Date() } }]
+      }
     ]
   });
   

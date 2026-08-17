@@ -103,21 +103,26 @@ const userSchema = new mongoose.Schema({
     }
   }],
 
-  // Health Metrics
+  // Health goals. The readings themselves live in the Activity collection; only
+  // the targets a user is aiming at are stored here. Field names match the
+  // `goalField` entries in models/metrics.js.
   healthMetrics: {
-    height: { type: Number }, // in cm
-    weight: { type: Number }, // in kg
-    targetWeight: { type: Number },
+    height: { type: Number }, // cm
+    targetWeight: { type: Number }, // kg
     dailyStepGoal: { type: Number, default: 10000 },
     dailyWaterGoal: { type: Number, default: 8 }, // glasses
-    weeklyWorkoutGoal: { type: Number, default: 5 } // sessions
+    weeklyWorkoutMinuteGoal: { type: Number, default: 150 }, // minutes per week
+    dailySleepGoal: { type: Number, default: 8 }, // hours
+    dailyMeditationGoal: { type: Number, default: 10 } // minutes
   },
 
-  // Financial Metrics
+  // Wealth profile. Individual movements live in the Transaction collection and
+  // targets in the Goal collection; this holds only standing figures.
   financialMetrics: {
     monthlyIncome: { type: Number },
     monthlySavingsGoal: { type: Number },
     emergencyFundGoal: { type: Number },
+    currentSavings: { type: Number, default: 0 },
     creditScore: { type: Number },
     riskTolerance: {
       type: String,
@@ -126,35 +131,22 @@ const userSchema = new mongoose.Schema({
     }
   },
 
-  // Insurance Information
-  insuranceInfo: {
-    healthInsurance: {
-      provider: String,
-      policyNumber: String,
-      coverageAmount: Number,
-      premium: Number,
-      expirationDate: Date
+  /**
+   * The social feed: milestones the user chose to share. Distinct from the
+   * Activity collection, which is the private health log. Capped to the most
+   * recent 50 by the $slice on the push in routes/community.js.
+   */
+  activities: [{
+    type: {
+      type: String,
+      enum: ['achievement', 'challenge_completion', 'milestone', 'level_up']
     },
-    lifeInsurance: {
-      provider: String,
-      policyNumber: String,
-      coverageAmount: Number,
-      premium: Number,
-      expirationDate: Date
-    },
-    autoInsurance: {
-      provider: String,
-      policyNumber: String,
-      vehicles: [{
-        make: String,
-        model: String,
-        year: Number,
-        vin: String
-      }],
-      premium: Number,
-      expirationDate: Date
+    data: mongoose.Schema.Types.Mixed,
+    timestamp: {
+      type: Date,
+      default: Date.now
     }
-  },
+  }],
 
   // Social Features
   friends: [{
@@ -236,6 +228,16 @@ const userSchema = new mongoose.Schema({
   },
 
   // Account Status
+  /**
+   * Read by authorize(...) in middleware/auth.js. Without this field every
+   * admin-only route returns 403, because req.user.role would be undefined.
+   * The `role` inside `teams` is a separate, team-scoped concept.
+   */
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -268,9 +270,8 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes for performance
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
+// Indexes for performance. email and username are already indexed by their
+// `unique: true` field option - repeating them here would define them twice.
 userSchema.index({ totalPoints: -1 });
 userSchema.index({ level: -1 });
 userSchema.index({ currentStreak: -1 });
@@ -278,7 +279,7 @@ userSchema.index({ createdAt: -1 });
 
 // Virtual for full name
 userSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`;
+  return `${this.firstName || ''} ${this.lastName || ''}`.trim();
 });
 
 // Virtual for required XP for next level

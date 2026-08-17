@@ -274,14 +274,16 @@ challengeSchema.index({ tags: 1 });
 
 // Virtual for participant count
 challengeSchema.virtual('participantCount').get(function() {
-  return this.participants.length;
+  return (this.participants || []).length;
 });
 
-// Virtual for completion rate
+// Virtual for completion rate. Guarded because a populate() projection may omit
+// `participants`, and virtuals still run when the document is serialised.
 challengeSchema.virtual('completionRate').get(function() {
-  if (this.participants.length === 0) return 0;
-  const completed = this.participants.filter(p => p.completed).length;
-  return Math.round((completed / this.participants.length) * 100);
+  const participants = this.participants || [];
+  if (participants.length === 0) return 0;
+  const completed = participants.filter(p => p.completed).length;
+  return Math.round((completed / participants.length) * 100);
 });
 
 // Virtual for days remaining
