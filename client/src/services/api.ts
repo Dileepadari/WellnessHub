@@ -1,265 +1,254 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+import type { ApiResponse, AuthPayload, RegisterData, User } from '@/types';
+
+// Same-origin by default: the Vite dev proxy and the production nginx both
+// forward /api to the backend, so the browser never makes a cross-origin call.
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const TOKEN_KEY = 'wellness_token';
+
+/** Thrown for any non-2xx response, carrying the status for callers that branch on it. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+type Listener = () => void;
+type Json = Record<string, unknown>;
+
+const qs = (params: Record<string, string | number | undefined>) => {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') search.set(key, String(value));
+  }
+  const out = search.toString();
+  return out ? `?${out}` : '';
+};
 
 class ApiService {
-  private token: string | null = null;
+  private token: string | null = localStorage.getItem(TOKEN_KEY);
+  private unauthorizedListeners = new Set<Listener>();
 
-  constructor() {
-    this.token = localStorage.getItem('wellness_token');
+  getToken() {
+    return this.token;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
-    
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
-        ...options.headers,
-      },
-      ...options,
+  /**
+   * Fires when the server rejects our token. AuthContext subscribes so an
+   * expired session drops the UI to the sign-in screen instead of leaving it
+   * signed in with every request failing.
+   */
+  onUnauthorized(listener: Listener): () => void {
+    this.unauthorizedListeners.add(listener);
+    return () => {
+      this.unauthorizedListeners.delete(listener);
     };
+  }
 
-    try {
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
+  private setToken(token: string | null) {
+    this.token = token;
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  }
 
-      return await response.json();
-    } catch (error) {
-      console.error('API request error:', error);
-      throw error;
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const headers = new Headers(options.headers);
+    if (!headers.has('Content-Type') && options.body) {
+      headers.set('Content-Type', 'application/json');
     }
+    if (this.token) headers.set('Authorization', `Bearer ${this.token}`);
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+
+    if (response.status === 401) {
+      this.setToken(null);
+      this.unauthorizedListeners.forEach((listener) => listener());
+    }
+
+    const body = response.status === 204 ? null : await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new ApiError(
+        (body as { message?: string } | null)?.message ??
+          `Request failed with status ${response.status}`,
+        response.status
+      );
+    }
+
+    return body as T;
   }
 
-  // Authentication
+  private get<T>(endpoint: string) {
+    return this.request<T>(endpoint);
+  }
+  private post<T>(endpoint: string, body?: unknown) {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    });
+  }
+  private put<T>(endpoint: string, body: unknown) {
+    return this.request<T>(endpoint, { method: 'PUT', body: JSON.stringify(body) });
+  }
+  private del<T>(endpoint: string) {
+    return this.request<T>(endpoint, { method: 'DELETE' });
+  }
+
+  // --- Auth ---
   async login(email: string, password: string) {
-    const response = await this.request<{ success: boolean; data: { token: string; user: any } }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-    
-    this.token = response.data.token;
-    localStorage.setItem('wellness_token', response.data.token);
-    return response;
+    const res = await this.post<ApiResponse<AuthPayload>>('/auth/login', { email, password });
+    this.setToken(res.data.token);
+    return res;
   }
 
-  async register(userData: {
-    username: string;
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    dateOfBirth?: string;
-    phoneNumber?: string;
-  }) {
-    const response = await this.request<{ success: boolean; data: { token: string; user: any } }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
-    
-    this.token = response.data.token;
-    localStorage.setItem('wellness_token', response.data.token);
-    return response;
+  async register(userData: RegisterData) {
+    const res = await this.post<ApiResponse<AuthPayload>>('/auth/register', userData);
+    this.setToken(res.data.token);
+    return res;
   }
 
-  async logout() {
-    this.token = null;
-    localStorage.removeItem('wellness_token');
+  logout() {
+    this.setToken(null);
   }
 
-  async getCurrentUser() {
-    return this.request<{ success: boolean; data: any }>('/auth/me');
+  getCurrentUser() {
+    return this.get<ApiResponse<{ user: User }>>('/auth/me');
   }
 
-  // User Profile
-  async updateProfile(profileData: any) {
-    return this.request<any>('/users/profile', {
-      method: 'PUT',
-      body: JSON.stringify(profileData),
-    });
+  // --- Users ---
+  updateProfile(data: Partial<User>) {
+    return this.put<ApiResponse<{ user: User }>>('/users/profile', data);
+  }
+  getUserStats() {
+    return this.get<ApiResponse<Json>>('/users/stats');
+  }
+  getUserLeaderboard() {
+    return this.get<ApiResponse<Json>>('/users/leaderboard');
   }
 
-  async getUserStats() {
-    return this.request<any>('/users/stats');
+  // --- Health ---
+  getHealthMetricDefs() {
+    return this.get<ApiResponse<Json>>('/health/metrics');
+  }
+  getHealthSummary(days = 7) {
+    return this.get<ApiResponse<Json>>(`/health/summary${qs({ days })}`);
+  }
+  getActivities(limit = 25) {
+    return this.get<ApiResponse<Json>>(`/health/activities${qs({ limit })}`);
+  }
+  logActivity(payload: Json) {
+    return this.post<ApiResponse<Json>>('/health/activities', payload);
+  }
+  deleteActivity(id: string) {
+    return this.del<ApiResponse<Json>>(`/health/activities/${id}`);
+  }
+  updateHealthGoals(payload: Json) {
+    return this.put<ApiResponse<Json>>('/health/goals', payload);
   }
 
-  // Health
-  async getHealthMetrics() {
-    return this.request<any>('/health/metrics');
+  // --- Wealth ---
+  getWealthCategories() {
+    return this.get<ApiResponse<Json>>('/wealth/categories');
+  }
+  getWealthSummary(months = 6) {
+    return this.get<ApiResponse<Json>>(`/wealth/summary${qs({ months })}`);
+  }
+  getTransactions(params: { limit?: number; kind?: string; month?: string } = {}) {
+    return this.get<ApiResponse<Json>>(`/wealth/transactions${qs(params)}`);
+  }
+  createTransaction(payload: Json) {
+    return this.post<ApiResponse<Json>>('/wealth/transactions', payload);
+  }
+  deleteTransaction(id: string) {
+    return this.del<ApiResponse<Json>>(`/wealth/transactions/${id}`);
+  }
+  getWealthGoals() {
+    return this.get<ApiResponse<Json>>('/wealth/goals');
+  }
+  createWealthGoal(payload: Json) {
+    return this.post<ApiResponse<Json>>('/wealth/goals', payload);
+  }
+  addGoalContribution(id: string, payload: Json) {
+    return this.post<ApiResponse<Json>>(`/wealth/goals/${id}/contributions`, payload);
+  }
+  deleteWealthGoal(id: string) {
+    return this.del<ApiResponse<Json>>(`/wealth/goals/${id}`);
+  }
+  updateWealthProfile(payload: Json) {
+    return this.put<ApiResponse<Json>>('/wealth/profile', payload);
   }
 
-  async logHealthData(healthData: any) {
-    return this.request<any>('/health/log', {
-      method: 'POST',
-      body: JSON.stringify(healthData),
-    });
+  // --- Insurance ---
+  getPolicyTypes() {
+    return this.get<ApiResponse<Json>>('/insurance/types');
+  }
+  getPolicies() {
+    return this.get<ApiResponse<Json>>('/insurance/policies');
+  }
+  createPolicy(payload: Json) {
+    return this.post<ApiResponse<Json>>('/insurance/policies', payload);
+  }
+  deletePolicy(id: string) {
+    return this.del<ApiResponse<Json>>(`/insurance/policies/${id}`);
+  }
+  getInsuranceAlerts() {
+    return this.get<ApiResponse<Json>>('/insurance/alerts');
+  }
+  getCoverage() {
+    return this.get<ApiResponse<Json>>('/insurance/coverage');
   }
 
-  async getHealthGoals() {
-    return this.request<any>('/health/goals');
+  // --- Challenges ---
+  getChallenges(params: { category?: string } = {}) {
+    return this.get<ApiResponse<Json>>(`/challenges${qs(params)}`);
+  }
+  getMyChallenges() {
+    return this.get<ApiResponse<Json>>('/challenges/mine');
+  }
+  joinChallenge(id: string) {
+    return this.post<ApiResponse<Json>>(`/challenges/${id}/join`);
+  }
+  updateChallengeProgress(id: string, payload: Json) {
+    return this.post<ApiResponse<Json>>(`/challenges/${id}/progress`, payload);
   }
 
-  async createHealthGoal(goalData: any) {
-    return this.request<any>('/health/goals', {
-      method: 'POST',
-      body: JSON.stringify(goalData),
-    });
+  // --- Community ---
+  getCommunityFeed(limit = 25) {
+    return this.get<ApiResponse<Json>>(`/community/feed${qs({ limit })}`);
+  }
+  shareToCommunity(payload: Json) {
+    return this.post<ApiResponse<Json>>('/community/share', payload);
+  }
+  getCommunityLeaderboard() {
+    return this.get<ApiResponse<Json>>('/community/leaderboard');
+  }
+  getTeams() {
+    return this.get<ApiResponse<Json>>('/community/teams');
+  }
+  joinTeam(id: string) {
+    return this.post<ApiResponse<Json>>(`/community/teams/${id}/join`);
   }
 
-  // Wealth
-  async getWealthData() {
-    return this.request<any>('/wealth');
+  // --- Gamification ---
+  getAchievements() {
+    return this.get<ApiResponse<Json>>('/gamification/achievements');
+  }
+  getProgress() {
+    return this.get<ApiResponse<Json>>('/gamification/progress');
+  }
+  claimDailyBonus() {
+    return this.post<ApiResponse<Json>>('/gamification/daily-bonus');
   }
 
-  async addExpense(expenseData: any) {
-    return this.request<any>('/wealth/expenses', {
-      method: 'POST',
-      body: JSON.stringify(expenseData),
-    });
+  // --- Analytics ---
+  getDashboard(period = '30d') {
+    return this.get<ApiResponse<Json>>(`/analytics/dashboard${qs({ period })}`);
   }
-
-  async addIncome(incomeData: any) {
-    return this.request<any>('/wealth/income', {
-      method: 'POST',
-      body: JSON.stringify(incomeData),
-    });
-  }
-
-  async getBudgets() {
-    return this.request<any>('/wealth/budgets');
-  }
-
-  async createBudget(budgetData: any) {
-    return this.request<any>('/wealth/budgets', {
-      method: 'POST',
-      body: JSON.stringify(budgetData),
-    });
-  }
-
-  // Insurance
-  async getInsurancePolicies() {
-    return this.request<any>('/insurance/policies');
-  }
-
-  async addInsurancePolicy(policyData: any) {
-    return this.request<any>('/insurance/policies', {
-      method: 'POST',
-      body: JSON.stringify(policyData),
-    });
-  }
-
-  async getInsuranceRecommendations() {
-    return this.request<any>('/insurance/recommendations');
-  }
-
-  // Challenges
-  async getChallenges() {
-    return this.request<any>('/challenges');
-  }
-
-  async joinChallenge(challengeId: string) {
-    return this.request<any>(`/challenges/${challengeId}/join`, {
-      method: 'POST',
-    });
-  }
-
-  async completeChallenge(challengeId: string, completionData: any) {
-    return this.request<any>(`/challenges/${challengeId}/complete`, {
-      method: 'POST',
-      body: JSON.stringify(completionData),
-    });
-  }
-
-  async getUserChallenges() {
-    return this.request<any>('/challenges/user');
-  }
-
-  // Community
-  async getCommunityPosts() {
-    return this.request<any>('/community/posts');
-  }
-
-  async createPost(postData: any) {
-    return this.request<any>('/community/posts', {
-      method: 'POST',
-      body: JSON.stringify(postData),
-    });
-  }
-
-  async likePost(postId: string) {
-    return this.request<any>(`/community/posts/${postId}/like`, {
-      method: 'POST',
-    });
-  }
-
-  async commentOnPost(postId: string, comment: string) {
-    return this.request<any>(`/community/posts/${postId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ content: comment }),
-    });
-  }
-
-  // Analytics
-  async getAnalytics(period: string = '30d') {
-    return this.request<any>(`/analytics?period=${period}`);
-  }
-
-  async getLeaderboard() {
-    return this.request<any>('/analytics/leaderboard');
-  }
-
-  // Achievements
-  async getAchievements() {
-    return this.request<any>('/gamification/achievements');
-  }
-
-  async getUserAchievements() {
-    return this.request<any>('/gamification/user-achievements');
-  }
-
-  // Teams
-  async getTeams() {
-    return this.request<any>('/gamification/teams');
-  }
-
-  async createTeam(teamData: any) {
-    return this.request<any>('/gamification/teams', {
-      method: 'POST',
-      body: JSON.stringify(teamData),
-    });
-  }
-
-  async joinTeam(teamId: string) {
-    return this.request<any>(`/gamification/teams/${teamId}/join`, {
-      method: 'POST',
-    });
-  }
-
-  async getLeaderboards() {
-    return this.request<any>('/gamification/leaderboards');
-  }
-
-  // Social Features
-  async getFeed() {
-    return this.request<any>('/community/feed');
-  }
-
-  async followUser(userId: string) {
-    return this.request<any>(`/users/${userId}/follow`, {
-      method: 'POST',
-    });
-  }
-
-  async unfollowUser(userId: string) {
-    return this.request<any>(`/users/${userId}/unfollow`, {
-      method: 'POST',
-    });
+  getTrends(period = '30d') {
+    return this.get<ApiResponse<Json>>(`/analytics/trends${qs({ period })}`);
   }
 }
 

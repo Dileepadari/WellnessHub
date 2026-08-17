@@ -1,323 +1,346 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiService } from '../services/api';
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { apiService } from '@/services/api';
 
-// Query Keys
-export const queryKeys = {
-  user: ['user'],
-  userStats: ['user', 'stats'],
+const MINUTE = 60 * 1000;
+type Json = Record<string, unknown>;
+
+export const keys = {
+  user: {
+    stats: ['user', 'stats'] as const,
+    leaderboard: ['user', 'leaderboard'] as const
+  },
   health: {
-    metrics: ['health', 'metrics'],
-    goals: ['health', 'goals'],
+    defs: ['health', 'defs'] as const,
+    summary: (days: number) => ['health', 'summary', days] as const,
+    activities: ['health', 'activities'] as const
   },
   wealth: {
-    data: ['wealth', 'data'],
-    budgets: ['wealth', 'budgets'],
+    categories: ['wealth', 'categories'] as const,
+    summary: (months: number) => ['wealth', 'summary', months] as const,
+    transactions: (params: string) => ['wealth', 'transactions', params] as const,
+    goals: ['wealth', 'goals'] as const
   },
   insurance: {
-    policies: ['insurance', 'policies'],
-    recommendations: ['insurance', 'recommendations'],
+    types: ['insurance', 'types'] as const,
+    policies: ['insurance', 'policies'] as const,
+    alerts: ['insurance', 'alerts'] as const,
+    coverage: ['insurance', 'coverage'] as const
   },
-  challenges: {
-    all: ['challenges'],
-    user: ['challenges', 'user'],
-  },
+  challenges: (category: string) => ['challenges', category] as const,
   community: {
-    posts: ['community', 'posts'],
+    feed: ['community', 'feed'] as const,
+    leaderboard: ['community', 'leaderboard'] as const
   },
-  analytics: (period: string) => ['analytics', period],
-  achievements: {
-    all: ['achievements'],
-    user: ['achievements', 'user'],
+  gamification: {
+    achievements: ['gamification', 'achievements'] as const,
+    progress: ['gamification', 'progress'] as const
   },
+  analytics: {
+    dashboard: (period: string) => ['analytics', 'dashboard', period] as const,
+    trends: (period: string) => ['analytics', 'trends', period] as const
+  }
 };
 
-// User Hooks
-export function useUserStats() {
-  return useQuery({
-    queryKey: queryKeys.userStats,
-    queryFn: () => apiService.getUserStats(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-}
+/** Everything a health write invalidates: the log, the summary, and derived figures. */
+const HEALTH_SCOPE: QueryKey[] = [
+  ['health'],
+  ['analytics'],
+  ['gamification', 'progress'],
+  ['user', 'stats']
+];
+const WEALTH_SCOPE: QueryKey[] = [['wealth'], ['analytics']];
+const INSURANCE_SCOPE: QueryKey[] = [['insurance'], ['analytics']];
 
-// Health Hooks
-export function useHealthMetrics() {
-  return useQuery({
-    queryKey: queryKeys.health.metrics,
-    queryFn: () => apiService.getHealthMetrics(),
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-}
+const messageOf = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
-export function useHealthGoals() {
-  return useQuery({
-    queryKey: queryKeys.health.goals,
-    queryFn: () => apiService.getHealthGoals(),
-  });
-}
-
-export function useLogHealthData() {
+/**
+ * The toast-plus-invalidate pattern every write shares. Keys are matched by
+ * prefix, so passing `['health']` refreshes every health query at once.
+ */
+function useWrite<TArgs, TResult>(options: {
+  mutationFn: (args: TArgs) => Promise<TResult>;
+  success: string;
+  failure: string;
+  invalidates?: QueryKey[];
+}) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (healthData: any) => apiService.logHealthData(healthData),
+    mutationFn: options.mutationFn,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.health.metrics });
-      queryClient.invalidateQueries({ queryKey: queryKeys.userStats });
-      toast.success('Health data logged successfully!');
+      options.invalidates?.forEach((queryKey) => {
+        void queryClient.invalidateQueries({ queryKey });
+      });
+      toast.success(options.success);
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to log health data');
-    },
+    onError: (error: unknown) => toast.error(messageOf(error, options.failure))
   });
 }
 
-export function useCreateHealthGoal() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (goalData: any) => apiService.createHealthGoal(goalData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.health.goals });
-      toast.success('Health goal created successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create health goal');
-    },
+// --- Health ---
+export const useHealthMetricDefs = () =>
+  useQuery({
+    queryKey: keys.health.defs,
+    queryFn: () => apiService.getHealthMetricDefs(),
+    staleTime: 60 * MINUTE
   });
-}
 
-// Wealth Hooks
-export function useWealthData() {
-  return useQuery({
-    queryKey: queryKeys.wealth.data,
-    queryFn: () => apiService.getWealthData(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+export const useHealthSummary = (days = 7) =>
+  useQuery({
+    queryKey: keys.health.summary(days),
+    queryFn: () => apiService.getHealthSummary(days),
+    staleTime: MINUTE
   });
-}
 
-export function useBudgets() {
-  return useQuery({
-    queryKey: queryKeys.wealth.budgets,
-    queryFn: () => apiService.getBudgets(),
+export const useActivities = (limit = 25) =>
+  useQuery({
+    queryKey: keys.health.activities,
+    queryFn: () => apiService.getActivities(limit),
+    staleTime: MINUTE
   });
-}
 
-export function useAddExpense() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (expenseData: any) => apiService.addExpense(expenseData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.wealth.data });
-      queryClient.invalidateQueries({ queryKey: queryKeys.userStats });
-      toast.success('Expense added successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to add expense');
-    },
+export const useLogActivity = () =>
+  useWrite({
+    mutationFn: (payload: Json) => apiService.logActivity(payload),
+    success: 'Logged',
+    failure: 'Could not log activity',
+    invalidates: HEALTH_SCOPE
   });
-}
 
-export function useAddIncome() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (incomeData: any) => apiService.addIncome(incomeData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.wealth.data });
-      queryClient.invalidateQueries({ queryKey: queryKeys.userStats });
-      toast.success('Income added successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to add income');
-    },
+export const useDeleteActivity = () =>
+  useWrite({
+    mutationFn: (id: string) => apiService.deleteActivity(id),
+    success: 'Entry deleted',
+    failure: 'Could not delete entry',
+    invalidates: HEALTH_SCOPE
   });
-}
 
-export function useCreateBudget() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (budgetData: any) => apiService.createBudget(budgetData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.wealth.budgets });
-      toast.success('Budget created successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create budget');
-    },
+export const useUpdateHealthGoals = () =>
+  useWrite({
+    mutationFn: (payload: Json) => apiService.updateHealthGoals(payload),
+    success: 'Goals updated',
+    failure: 'Could not update goals',
+    invalidates: HEALTH_SCOPE
   });
-}
 
-// Insurance Hooks
-export function useInsurancePolicies() {
-  return useQuery({
-    queryKey: queryKeys.insurance.policies,
-    queryFn: () => apiService.getInsurancePolicies(),
+// --- Wealth ---
+export const useWealthCategories = () =>
+  useQuery({
+    queryKey: keys.wealth.categories,
+    queryFn: () => apiService.getWealthCategories(),
+    staleTime: 60 * MINUTE
   });
-}
 
-export function useInsuranceRecommendations() {
-  return useQuery({
-    queryKey: queryKeys.insurance.recommendations,
-    queryFn: () => apiService.getInsuranceRecommendations(),
-    staleTime: 30 * 60 * 1000, // 30 minutes
+export const useWealthSummary = (months = 6) =>
+  useQuery({
+    queryKey: keys.wealth.summary(months),
+    queryFn: () => apiService.getWealthSummary(months),
+    staleTime: MINUTE
   });
-}
 
-export function useAddInsurancePolicy() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (policyData: any) => apiService.addInsurancePolicy(policyData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.insurance.policies });
-      queryClient.invalidateQueries({ queryKey: queryKeys.userStats });
-      toast.success('Insurance policy added successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to add insurance policy');
-    },
+export const useTransactions = (params: { limit?: number; kind?: string; month?: string } = {}) =>
+  useQuery({
+    queryKey: keys.wealth.transactions(JSON.stringify(params)),
+    queryFn: () => apiService.getTransactions(params),
+    staleTime: MINUTE
   });
-}
 
-// Challenge Hooks
-export function useChallenges() {
-  return useQuery({
-    queryKey: queryKeys.challenges.all,
-    queryFn: () => apiService.getChallenges(),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+export const useCreateTransaction = () =>
+  useWrite({
+    mutationFn: (payload: Json) => apiService.createTransaction(payload),
+    success: 'Transaction recorded',
+    failure: 'Could not record transaction',
+    invalidates: WEALTH_SCOPE
   });
-}
 
-export function useUserChallenges() {
-  return useQuery({
-    queryKey: queryKeys.challenges.user,
-    queryFn: () => apiService.getUserChallenges(),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+export const useDeleteTransaction = () =>
+  useWrite({
+    mutationFn: (id: string) => apiService.deleteTransaction(id),
+    success: 'Transaction deleted',
+    failure: 'Could not delete transaction',
+    invalidates: WEALTH_SCOPE
   });
-}
 
-export function useJoinChallenge() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (challengeId: string) => apiService.joinChallenge(challengeId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.challenges.user });
-      queryClient.invalidateQueries({ queryKey: queryKeys.userStats });
-      toast.success('Challenge joined successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to join challenge');
-    },
+export const useWealthGoals = () =>
+  useQuery({ queryKey: keys.wealth.goals, queryFn: () => apiService.getWealthGoals() });
+
+export const useCreateWealthGoal = () =>
+  useWrite({
+    mutationFn: (payload: Json) => apiService.createWealthGoal(payload),
+    success: 'Goal created',
+    failure: 'Could not create goal',
+    invalidates: WEALTH_SCOPE
   });
-}
 
-export function useCompleteChallenge() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ challengeId, completionData }: { challengeId: string; completionData: any }) =>
-      apiService.completeChallenge(challengeId, completionData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.challenges.user });
-      queryClient.invalidateQueries({ queryKey: queryKeys.userStats });
-      queryClient.invalidateQueries({ queryKey: queryKeys.achievements.user });
-      toast.success('Challenge completed! 🎉');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to complete challenge');
-    },
+export const useAddGoalContribution = () =>
+  useWrite({
+    mutationFn: ({ id, ...payload }: Json & { id: string }) =>
+      apiService.addGoalContribution(id, payload),
+    success: 'Contribution added',
+    failure: 'Could not add contribution',
+    invalidates: WEALTH_SCOPE
   });
-}
 
-// Community Hooks
-export function useCommunityPosts() {
-  return useQuery({
-    queryKey: queryKeys.community.posts,
-    queryFn: () => apiService.getCommunityPosts(),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+export const useDeleteWealthGoal = () =>
+  useWrite({
+    mutationFn: (id: string) => apiService.deleteWealthGoal(id),
+    success: 'Goal deleted',
+    failure: 'Could not delete goal',
+    invalidates: WEALTH_SCOPE
   });
-}
 
-export function useCreatePost() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (postData: any) => apiService.createPost(postData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.community.posts });
-      toast.success('Post created successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create post');
-    },
+export const useUpdateWealthProfile = () =>
+  useWrite({
+    mutationFn: (payload: Json) => apiService.updateWealthProfile(payload),
+    success: 'Profile updated',
+    failure: 'Could not update profile',
+    invalidates: WEALTH_SCOPE
   });
-}
 
-export function useLikePost() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (postId: string) => apiService.likePost(postId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.community.posts });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to like post');
-    },
+// --- Insurance ---
+export const usePolicyTypes = () =>
+  useQuery({
+    queryKey: keys.insurance.types,
+    queryFn: () => apiService.getPolicyTypes(),
+    staleTime: 60 * MINUTE
   });
-}
 
-export function useCommentOnPost() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ postId, comment }: { postId: string; comment: string }) =>
-      apiService.commentOnPost(postId, comment),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.community.posts });
-      toast.success('Comment added successfully!');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to add comment');
-    },
+export const usePolicies = () =>
+  useQuery({ queryKey: keys.insurance.policies, queryFn: () => apiService.getPolicies() });
+
+export const useInsuranceAlerts = () =>
+  useQuery({ queryKey: keys.insurance.alerts, queryFn: () => apiService.getInsuranceAlerts() });
+
+export const useCoverage = () =>
+  useQuery({ queryKey: keys.insurance.coverage, queryFn: () => apiService.getCoverage() });
+
+export const useCreatePolicy = () =>
+  useWrite({
+    mutationFn: (payload: Json) => apiService.createPolicy(payload),
+    success: 'Policy added',
+    failure: 'Could not add policy',
+    invalidates: INSURANCE_SCOPE
   });
-}
 
-// Analytics Hooks
-export function useAnalytics(period: string = '30d') {
-  return useQuery({
-    queryKey: queryKeys.analytics(period),
-    queryFn: () => apiService.getAnalytics(period),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+export const useDeletePolicy = () =>
+  useWrite({
+    mutationFn: (id: string) => apiService.deletePolicy(id),
+    success: 'Policy deleted',
+    failure: 'Could not delete policy',
+    invalidates: INSURANCE_SCOPE
   });
-}
 
-export function useLeaderboard() {
-  return useQuery({
-    queryKey: ['leaderboard'],
-    queryFn: () => apiService.getLeaderboard(),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+// --- Challenges ---
+export const useChallenges = (category = '') =>
+  useQuery({
+    queryKey: keys.challenges(category),
+    queryFn: () => apiService.getChallenges(category ? { category } : {}),
+    staleTime: 5 * MINUTE
   });
-}
 
-// Achievement Hooks
-export function useAchievements() {
-  return useQuery({
-    queryKey: queryKeys.achievements.all,
+export const useMyChallenges = () =>
+  useQuery({
+    queryKey: ['challenges', 'mine'],
+    queryFn: () => apiService.getMyChallenges(),
+    staleTime: MINUTE
+  });
+
+export const useJoinChallenge = () =>
+  useWrite({
+    mutationFn: (id: string) => apiService.joinChallenge(id),
+    success: 'Joined',
+    failure: 'Could not join challenge',
+    invalidates: [['challenges'], ['user', 'stats'], ['analytics']]
+  });
+
+// --- Community ---
+export const useCommunityFeed = (limit = 25) =>
+  useQuery({
+    queryKey: keys.community.feed,
+    queryFn: () => apiService.getCommunityFeed(limit),
+    staleTime: MINUTE
+  });
+
+export const useCommunityLeaderboard = () =>
+  useQuery({
+    queryKey: keys.community.leaderboard,
+    queryFn: () => apiService.getCommunityLeaderboard(),
+    staleTime: 5 * MINUTE
+  });
+
+export const useTeams = () =>
+  useQuery({
+    queryKey: ['community', 'teams'],
+    queryFn: () => apiService.getTeams(),
+    staleTime: 5 * MINUTE
+  });
+
+export const useJoinTeam = () =>
+  useWrite({
+    mutationFn: (id: string) => apiService.joinTeam(id),
+    success: 'Joined team',
+    failure: 'Could not join team',
+    invalidates: [['community']]
+  });
+
+export const useShareToCommunity = () =>
+  useWrite({
+    mutationFn: (payload: Json) => apiService.shareToCommunity(payload),
+    success: 'Shared',
+    failure: 'Could not share',
+    invalidates: [['community']]
+  });
+
+// --- Gamification ---
+export const useAchievements = () =>
+  useQuery({
+    queryKey: keys.gamification.achievements,
     queryFn: () => apiService.getAchievements(),
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 30 * MINUTE
   });
-}
 
-export function useUserAchievements() {
-  return useQuery({
-    queryKey: queryKeys.achievements.user,
-    queryFn: () => apiService.getUserAchievements(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+export const useProgress = () =>
+  useQuery({
+    queryKey: keys.gamification.progress,
+    queryFn: () => apiService.getProgress(),
+    staleTime: MINUTE
   });
-}
+
+export const useClaimDailyBonus = () =>
+  useWrite({
+    mutationFn: () => apiService.claimDailyBonus(),
+    success: 'Daily bonus claimed',
+    failure: 'Daily bonus unavailable',
+    invalidates: [['gamification'], ['user', 'stats'], ['analytics']]
+  });
+
+// --- Analytics ---
+export const useDashboard = (period = '30d') =>
+  useQuery({
+    queryKey: keys.analytics.dashboard(period),
+    queryFn: () => apiService.getDashboard(period),
+    staleTime: MINUTE
+  });
+
+export const useTrends = (period = '30d') =>
+  useQuery({
+    queryKey: keys.analytics.trends(period),
+    queryFn: () => apiService.getTrends(period),
+    staleTime: MINUTE
+  });
+
+export const useUserStats = () =>
+  useQuery({
+    queryKey: keys.user.stats,
+    queryFn: () => apiService.getUserStats(),
+    staleTime: MINUTE
+  });
+
+export const useUserLeaderboard = () =>
+  useQuery({
+    queryKey: keys.user.leaderboard,
+    queryFn: () => apiService.getUserLeaderboard(),
+    staleTime: 5 * MINUTE
+  });

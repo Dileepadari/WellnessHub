@@ -2,325 +2,331 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+/*
+ * A console, not a dashboard.
+ *
+ * The rules that keep it that way: hairline rules instead of cards, 2px radii,
+ * no gradients or shadows, one accent colour used only for interaction, and
+ * tabular numerals everywhere a figure appears so columns align down the page.
+ */
 
 @layer base {
+  :root {
+    color-scheme: light;
+
+    --bg: 0 0% 100%;
+    --bg-sunken: 220 14% 97%;
+    --bg-raised: 0 0% 100%;
+    --bg-hover: 220 14% 96%;
+    --bg-active: 220 13% 93%;
+
+    --fg: 222 14% 11%;
+    --fg-muted: 220 9% 43%;
+    --fg-subtle: 220 9% 60%;
+
+    --line: 220 13% 89%;
+    --line-strong: 220 13% 80%;
+
+    --accent: 231 68% 56%;
+    --accent-fg: 0 0% 100%;
+    --accent-subtle: 231 68% 96%;
+
+    --good: 152 56% 34%;
+    --warn: 35 85% 42%;
+    --bad: 358 65% 49%;
+
+    --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --bg: 222 18% 9%;
+    --bg-sunken: 222 20% 7%;
+    --bg-raised: 222 16% 12%;
+    --bg-hover: 222 15% 15%;
+    --bg-active: 222 15% 18%;
+
+    --fg: 220 14% 93%;
+    --fg-muted: 220 9% 62%;
+    --fg-subtle: 220 9% 46%;
+
+    --line: 222 13% 20%;
+    --line-strong: 222 13% 28%;
+
+    --accent: 231 75% 68%;
+    --accent-fg: 222 20% 10%;
+    --accent-subtle: 231 40% 18%;
+
+    --good: 152 45% 52%;
+    --warn: 35 80% 58%;
+    --bad: 358 70% 64%;
+  }
+
   * {
-    @apply border-gray-200 dark:border-gray-700;
+    border-color: hsl(var(--line));
   }
-  
+
   html {
-    font-family: 'Inter', system-ui, sans-serif;
-    scroll-behavior: smooth;
-  }
-  
-  body {
-    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300;
-    margin: 0;
+    font-family: var(--font-ui);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
-  code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+
+  body {
+    margin: 0;
+    background: hsl(var(--bg));
+    color: hsl(var(--fg));
+    font-size: 13px;
+    line-height: 1.45;
   }
-  
-  /* Custom scrollbar */
+
+  /* Figures line up in columns only if the digits are the same width. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.25);
+  }
+
   ::-webkit-scrollbar {
-    width: 6px;
+    width: 10px;
+    height: 10px;
   }
-  
   ::-webkit-scrollbar-track {
-    @apply bg-gray-100 dark:bg-gray-800;
+    background: transparent;
   }
-  
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+    background: hsl(var(--line-strong));
+    border: 3px solid hsl(var(--bg));
+    border-radius: 99px;
   }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400 dark:bg-gray-500;
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--accent));
+    outline-offset: 1px;
   }
 }
 
 @layer components {
-  /* Card Components */
-  .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300;
+  /* --- Surfaces --- */
+  .panel {
+    background: hsl(var(--bg-raised));
+    border: 1px solid hsl(var(--line));
+    border-radius: 3px;
   }
-  
-  .card-compact {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-all duration-300;
+
+  .panel-head {
+    @apply flex items-center justify-between gap-3 px-3 min-h-9 py-1 border-b flex-wrap;
+    background: hsl(var(--bg-sunken));
   }
-  
-  /* Button Components */
+
+  /* Panels never widen to fit their content; wide tables scroll inside instead. */
+  .panel {
+    min-width: 0;
+  }
+
+  /* --- Micro label: the small uppercase caption above a figure or column --- */
+  .micro {
+    @apply text-[10px] font-medium uppercase tracking-[0.08em];
+    color: hsl(var(--fg-subtle));
+  }
+
+  /* --- Tables --- */
+  .tbl {
+    @apply w-full border-collapse;
+    /*
+     * Alignment is set here rather than on `thead th`, because a `.tbl thead th`
+     * rule out-specifies a `text-right` utility placed on the cell and the
+     * header would never follow its column. Inherited alignment loses to any
+     * direct rule, so utilities win.
+     */
+    text-align: left;
+  }
+
+  .tbl thead th {
+    @apply font-medium px-3 py-1.5 border-b whitespace-nowrap;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: hsl(var(--fg-subtle));
+    background: hsl(var(--bg-sunken));
+  }
+
+  /* Put on the label column so numeric columns collapse to their content. */
+  .tbl .grow-col {
+    width: 100%;
+  }
+
+  .tbl tbody td {
+    @apply px-3 py-1.5 border-b align-middle;
+    border-color: hsl(var(--line));
+  }
+
+  .tbl tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .tbl tbody tr:hover td {
+    background: hsl(var(--bg-hover));
+  }
+
+  .tbl .num {
+    @apply text-right tnum;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  /* --- Controls --- */
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 h-7 px-2.5 rounded-[3px] border font-medium transition-colors;
+    font-size: 12px;
+    background: hsl(var(--bg-raised));
+    color: hsl(var(--fg));
   }
-  
-  .btn-primary {
-    @apply btn bg-primary-500 hover:bg-primary-600 text-white focus:ring-primary-500 shadow-md hover:shadow-lg;
+  .btn:hover:not(:disabled) {
+    background: hsl(var(--bg-hover));
   }
-  
-  .btn-secondary {
-    @apply btn bg-secondary-500 hover:bg-secondary-600 text-white focus:ring-secondary-500 shadow-md hover:shadow-lg;
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
-  
-  .btn-success {
-    @apply btn bg-success-500 hover:bg-success-600 text-white focus:ring-success-500 shadow-md hover:shadow-lg;
+
+  .btn-accent {
+    background: hsl(var(--accent));
+    border-color: hsl(var(--accent));
+    color: hsl(var(--accent-fg));
   }
-  
-  .btn-outline {
-    @apply btn border-2 border-primary-500 text-primary-500 hover:bg-primary-500 hover:text-white focus:ring-primary-500;
+  .btn-accent:hover:not(:disabled) {
+    background: hsl(var(--accent) / 0.88);
   }
-  
+
   .btn-ghost {
-    @apply btn bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300;
+    background: transparent;
+    border-color: transparent;
+    color: hsl(var(--fg-muted));
   }
-  
-  .btn-sm {
-    @apply px-3 py-1.5 text-sm;
+  .btn-ghost:hover:not(:disabled) {
+    background: hsl(var(--bg-hover));
+    color: hsl(var(--fg));
   }
-  
-  .btn-lg {
-    @apply px-6 py-3 text-lg;
+
+  .input {
+    @apply w-full h-7 px-2 rounded-[3px] border transition-colors;
+    font-size: 12px;
+    background: hsl(var(--bg));
+    color: hsl(var(--fg));
   }
-  
-  /* Form Components */
-  .form-input {
-    @apply w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200;
+  .input:focus {
+    border-color: hsl(var(--accent));
+    outline: none;
   }
-  
-  .form-label {
-    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2;
+  .input::placeholder {
+    color: hsl(var(--fg-subtle));
   }
-  
-  /* Navigation Components */
-  .nav-link {
-    @apply px-3 py-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-primary-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200;
+  .input:disabled {
+    background: hsl(var(--bg-sunken));
+    color: hsl(var(--fg-muted));
   }
-  
-  .nav-link-active {
-    @apply nav-link text-primary-500 bg-primary-50 dark:bg-primary-900/20;
+
+  /* Numeric inputs use the mono stack so typed figures match the tables. */
+  .input-num {
+    font-family: var(--font-mono);
+    @apply tnum text-right;
   }
-  
-  /* Progress Components */
-  .progress-bar {
-    @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden;
+
+  .field-label {
+    @apply block mb-1 micro;
   }
-  
-  .progress-fill {
-    @apply h-full bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-500 ease-out;
+
+  /* --- Keyboard hint --- */
+  .kbd {
+    @apply inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-[3px] border;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    color: hsl(var(--fg-muted));
+    background: hsl(var(--bg-sunken));
   }
-  
-  /* Badge Components */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+
+  /* --- Tag: low-contrast, no pill --- */
+  .tag {
+    @apply inline-flex items-center h-[18px] px-1.5 rounded-[3px] border font-medium;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: hsl(var(--fg-muted));
+    background: hsl(var(--bg-sunken));
   }
-  
-  .badge-primary {
-    @apply badge bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200;
+  .tag-good {
+    color: hsl(var(--good));
+    border-color: hsl(var(--good) / 0.35);
+    background: hsl(var(--good) / 0.08);
   }
-  
-  .badge-success {
-    @apply badge bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200;
+  .tag-warn {
+    color: hsl(var(--warn));
+    border-color: hsl(var(--warn) / 0.35);
+    background: hsl(var(--warn) / 0.08);
   }
-  
-  .badge-warning {
-    @apply badge bg-warning-100 text-warning-800 dark:bg-warning-900 dark:text-warning-200;
+  .tag-bad {
+    color: hsl(var(--bad));
+    border-color: hsl(var(--bad) / 0.35);
+    background: hsl(var(--bad) / 0.08);
   }
-  
-  .badge-secondary {
-    @apply badge bg-secondary-100 text-secondary-800 dark:bg-secondary-900 dark:text-secondary-200;
+
+  /* --- Meter: a 3px rule, not a rounded pill --- */
+  .meter {
+    @apply relative w-full overflow-hidden;
+    height: 3px;
+    background: hsl(var(--line));
+    border-radius: 1px;
   }
-  
-  /* Layout Components */
-  .container-custom {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  .meter > span {
+    @apply absolute left-0 top-0 h-full;
+    background: hsl(var(--accent));
+    border-radius: 1px;
   }
-  
-  .section-padding {
-    @apply py-8 md:py-12 lg:py-16;
+  .meter.is-good > span {
+    background: hsl(var(--good));
   }
-  
-  /* Stat Components */
-  .stat-card {
-    @apply card p-6 text-center;
+  .meter.is-warn > span {
+    background: hsl(var(--warn));
   }
-  
-  .stat-value {
-    @apply text-3xl font-bold mb-2;
+
+  /* --- Nav --- */
+  .nav-item {
+    @apply flex items-center gap-2 h-7 px-2 rounded-[3px] transition-colors;
+    font-size: 12px;
+    color: hsl(var(--fg-muted));
   }
-  
-  .stat-label {
-    @apply text-sm text-gray-600 dark:text-gray-400;
+  .nav-item:hover {
+    background: hsl(var(--bg-hover));
+    color: hsl(var(--fg));
   }
-  
-  /* Avatar Components */
-  .avatar {
-    @apply rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 flex items-center justify-center text-white font-bold;
-  }
-  
-  .avatar-sm {
-    @apply avatar w-8 h-8 text-sm;
-  }
-  
-  .avatar-md {
-    @apply avatar w-10 h-10 text-base;
-  }
-  
-  .avatar-lg {
-    @apply avatar w-12 h-12 text-lg;
-  }
-  
-  .avatar-xl {
-    @apply avatar w-16 h-16 text-xl;
+  .nav-item[aria-current='page'] {
+    background: hsl(var(--accent-subtle));
+    color: hsl(var(--accent));
+    font-weight: 500;
   }
 }
 
 @layer utilities {
-  /* Animation utilities */
-  .animate-glow {
-    animation: glow 2s ease-in-out infinite alternate;
+  /*
+   * The ADK DEV mark is solid purple on transparent. brightness(0) flattens any
+   * opaque pixel to black while keeping the alpha shape, so one file reads
+   * correctly on both a light and a dark surface.
+   */
+  .logo-mono {
+    filter: brightness(0);
   }
-  
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+  .dark .logo-mono {
+    filter: brightness(0) invert(1);
   }
-  
-  /* Custom utilities */
-  .text-balance {
-    text-wrap: balance;
-  }
-  
-  .gradient-border {
-    background: linear-gradient(white, white) padding-box,
-                linear-gradient(45deg, #5D5CDE, #FF6B6B) border-box;
-    border: 2px solid transparent;
-  }
-  
-  .dark .gradient-border {
-    background: linear-gradient(rgb(31, 41, 55), rgb(31, 41, 55)) padding-box,
-                linear-gradient(45deg, #5D5CDE, #FF6B6B) border-box;
-  }
-  
-  /* Progress ring utilities */
-  .progress-ring {
-    transform: rotate(-90deg);
-  }
-  
-  .progress-ring-circle {
-    transition: stroke-dasharray 0.35s;
-  }
-  
-  /* Notification utilities */
-  .notification {
-    @apply fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm animate-slide-up;
-  }
-  
-  .notification-success {
-    @apply notification bg-success-500 text-white;
-  }
-  
-  .notification-error {
-    @apply notification bg-red-500 text-white;
-  }
-  
-  .notification-warning {
-    @apply notification bg-warning-500 text-white;
-  }
-  
-  .notification-info {
-    @apply notification bg-blue-500 text-white;
-  }
-}
 
-/* Custom animations */
-@keyframes glow {
-  from {
-    box-shadow: 0 0 5px rgba(93, 92, 222, 0.5);
+  .mono {
+    font-family: var(--font-mono);
   }
-  to {
-    box-shadow: 0 0 20px rgba(93, 92, 222, 0.8), 0 0 30px rgba(93, 92, 222, 0.6);
-  }
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideDown {
-  from {
-    transform: translateY(-20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Custom focus styles */
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
-}
-
-/* Loading spinner */
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #5D5CDE;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Custom selection */
-::selection {
-  @apply bg-primary-500 text-white;
-}
-
-::-moz-selection {
-  @apply bg-primary-500 text-white;
 }

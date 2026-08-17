@@ -1,63 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { apiService } from '../services/api';
+import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
-
-interface User {
-  _id: string;
-  username: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  avatar?: string;
-  dateOfBirth?: string;
-  phoneNumber?: string;
-  level: number;
-  experience: number;
-  totalPoints: number;
-  availablePoints: number;
-  currentStreak: number;
-  longestStreak: number;
-  healthMetrics: {
-    height?: number;
-    weight?: number;
-    targetWeight?: number;
-    dailyStepGoal: number;
-    dailyWaterGoal: number;
-    weeklyWorkoutGoal: number;
-  };
-  financialMetrics: {
-    monthlyIncome?: number;
-    monthlySavingsGoal?: number;
-    emergencyFundGoal?: number;
-    creditScore?: number;
-    riskTolerance: string;
-  };
-  preferences: {
-    notifications: {
-      email: boolean;
-      push: boolean;
-      sms: boolean;
-      achievements: boolean;
-      challenges: boolean;
-      social: boolean;
-    };
-    privacy: {
-      profileVisibility: string;
-      showRealName: boolean;
-      showStats: boolean;
-      showAchievements: boolean;
-    };
-    theme: string;
-  };
-  achievements: any[];
-  teams: any[];
-  activeChallenges: any[];
-  isActive: boolean;
-  isEmailVerified: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import { apiService } from '@/services/api';
+import type { RegisterData, User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -65,114 +9,103 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
-  updateProfile: (profileData: any) => Promise<void>;
+  updateProfile: (profileData: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
-interface RegisterData {
-  username: string;
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  dateOfBirth?: string;
-  phoneNumber?: string;
-}
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const errorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshUser = async () => {
-    try {
-      const response = await apiService.getCurrentUser();
-      setUser(response.data);
-    } catch (error) {
-      console.error('Failed to fetch user:', error);
-      // If token is invalid, clear it
-      await apiService.logout();
-      setUser(null);
-    }
-  };
+  const refreshUser = useCallback(async () => {
+    const response = await apiService.getCurrentUser();
+    setUser(response.data.user);
+  }, []);
 
-  const login = async (email: string, password: string) => {
+  const logout = useCallback(() => {
+    apiService.logout();
+    setUser(null);
+  }, []);
+
+  const login = useCallback(async (email: string, password: string) => {
     try {
-      setLoading(true);
       const response = await apiService.login(email, password);
       setUser(response.data.user);
       toast.success('Welcome back!');
-    } catch (error: any) {
-      toast.error(error.message || 'Login failed');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Login failed'));
       throw error;
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
-  const register = async (userData: RegisterData) => {
+  const register = useCallback(async (userData: RegisterData) => {
     try {
-      setLoading(true);
       const response = await apiService.register(userData);
       setUser(response.data.user);
       toast.success('Welcome to WellnessHub!');
-    } catch (error: any) {
-      toast.error(error.message || 'Registration failed');
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = () => {
-    apiService.logout();
-    setUser(null);
-    toast.success('Logged out successfully');
-  };
-
-  const updateProfile = async (profileData: any) => {
-    try {
-      const updatedUser = await apiService.updateProfile(profileData);
-      setUser(updatedUser);
-      toast.success('Profile updated successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update profile');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Registration failed'));
       throw error;
     }
-  };
-
-  useEffect(() => {
-    const initAuth = async () => {
-      const token = localStorage.getItem('wellness_token');
-      if (token) {
-        await refreshUser();
-      }
-      setLoading(false);
-    };
-
-    initAuth();
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        register,
-        logout,
-        updateProfile,
-        refreshUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const updateProfile = useCallback(async (profileData: Partial<User>) => {
+    try {
+      const response = await apiService.updateProfile(profileData);
+      setUser(response.data.user);
+      toast.success('Profile updated');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to update profile'));
+      throw error;
+    }
+  }, []);
+
+  // A token rejected by the server means the session is over, whether it expired
+  // or was revoked. Drop it here so the UI never sits in a broken signed-in state.
+  useEffect(
+    () =>
+      apiService.onUnauthorized(() => {
+        setUser(null);
+      }),
+    []
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initAuth = async () => {
+      if (apiService.getToken()) {
+        try {
+          await refreshUser();
+        } catch {
+          // A stale token is not an error worth showing on first paint.
+          apiService.logout();
+        }
+      }
+      if (!cancelled) setLoading(false);
+    };
+
+    void initAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshUser]);
+
+  const value = useMemo(
+    () => ({ user, loading, login, register, logout, updateProfile, refreshUser }),
+    [user, loading, login, register, logout, updateProfile, refreshUser]
+  );
+
+  return <AuthContext value={value}>{children}</AuthContext>;
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = use(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
