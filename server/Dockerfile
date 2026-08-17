@@ -1,32 +1,22 @@
-# Use Node.js 18 Alpine as base image
-FROM node:20-alpine as build
+FROM node:20-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Dependencies are installed from the lockfile so an image build is reproducible.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Install dependencies
-RUN npm install --only=production
-
-# Copy source code
 COPY . .
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# Writable at runtime for log files.
+RUN mkdir -p logs && chown -R node:node /app
 
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+USER node
 
-# Expose port
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5000/health || exit 1
+# node is already in the image, so no extra package is needed for the probe.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:5000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

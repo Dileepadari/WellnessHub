@@ -1,104 +1,70 @@
 services:
-  # MongoDB Database
   mongodb:
     image: mongo:7.0
     container_name: wellnesshub-mongodb
     restart: unless-stopped
-    ports:
-      - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: wellnesshub
-    volumes:
-      - mongodb_data:/data/db
-      - ./server/src/config/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    networks:
-      - wellnesshub-network
-
-  # Redis Cache (for future use)
-  redis:
-    image: redis:7.2-alpine
-    container_name: wellnesshub-redis
-    restart: unless-stopped
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-wellnesshub}
     ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
+      # Exposed so `npm run dev` on the host can reach this database too.
+      # Drop this mapping when deploying.
+      - '${MONGO_PORT:-27017}:27017'
     volumes:
-      - redis_data:/data
+      # Collections and indexes are created by the Mongoose schemas on boot,
+      # and sample data comes from `npm run seed`, so no init script is mounted.
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
-      - wellnesshub-network
+      - wellnesshub
 
-  # Backend API Server
   backend:
     build:
       context: ./server
-      dockerfile: Dockerfile
     container_name: wellnesshub-backend
     restart: unless-stopped
-    ports:
-      - "5000:5000"
     environment:
       NODE_ENV: production
       PORT: 5000
-      MONGODB_URI: mongodb://admin:password@mongodb:27017/wellnesshub?authSource=admin
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB_NAME:-wellnesshub}?authSource=admin
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       JWT_EXPIRE: ${JWT_EXPIRE:-7d}
-      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      # The browser talks to nginx, which proxies /api, so the API's own origin
+      # is the frontend's.
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-15}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
     depends_on:
-      - mongodb
-      - redis
-    volumes:
-      - ./server/uploads:/app/uploads
+      mongodb:
+        condition: service_healthy
     networks:
-      - wellnesshub-network
+      - wellnesshub
 
-  # Frontend React App
   frontend:
     build:
       context: ./client
-      dockerfile: Dockerfile
       args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000/api}
-        REACT_APP_SOCKET_URL: ${REACT_APP_SOCKET_URL:-http://localhost:5000}
+        # Same-origin by default: nginx in this image proxies /api to backend.
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: wellnesshub-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - '${FRONTEND_PORT:-3000}:80'
     depends_on:
       - backend
     networks:
-      - wellnesshub-network
-
-  # Nginx Reverse Proxy (optional for production)
-  nginx:
-    image: nginx:alpine
-    container_name: wellnesshub-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - wellnesshub-network
-    profiles:
-      - production
+      - wellnesshub
 
 volumes:
   mongodb_data:
     driver: local
-  redis_data:
-    driver: local
 
 networks:
-  wellnesshub-network:
+  wellnesshub:
     driver: bridge

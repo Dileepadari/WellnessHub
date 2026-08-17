@@ -1,38 +1,27 @@
-# Build stage
 FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install
-
-# Copy source code
 COPY . .
 
-# Build the app
+# Vite inlines VITE_* variables at build time, so they arrive as build args.
+# The default is a same-origin /api, which nginx proxies to the backend.
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build
 
-# Production stage
 FROM nginx:alpine
 
-# Install wget for health checks
-RUN apk add --no-cache wget
-
-# Copy built app to nginx
-COPY --from=build /app/build /usr/share/nginx/html
-
-# Copy nginx configuration
+COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port
 EXPOSE 80
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost/healthz || exit 1
 
-# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
