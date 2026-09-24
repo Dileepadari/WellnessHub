@@ -144,10 +144,17 @@ jobs:
         if: failure()
         run: docker compose logs --no-color
 
+      # Every check below addresses the stack through the frontend, because that
+      # is the only service publishing a host port: the backend is reachable
+      # only on the compose network. Reading the port from compose rather than
+      # hard-coding it means this cannot drift from the mapping.
+      - name: Resolve the published address
+        run: echo "BASE=http://$(docker compose port frontend 80)" >> "$GITHUB_ENV"
+
       - name: Wait for the API to answer
         run: |
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:5000/health > /dev/null; then
+            if curl -fsS "$BASE/api/healthz" > /dev/null; then
               echo "API healthy after ${i}s"
               exit 0
             fi
@@ -158,7 +165,7 @@ jobs:
           exit 1
 
       - name: Client is served
-        run: curl -fsS http://localhost:3000 > /dev/null
+        run: curl -fsS "$BASE" > /dev/null
 
       # A container that serves every request while reporting unhealthy is a
       # trap for anything that gates on health, and nothing else here notices.
@@ -178,10 +185,10 @@ jobs:
       # short of reading a real response catches that.
       - name: Security headers reach the pages that need them
         run: |
-          asset=$(curl -fsS http://localhost:3000/ | grep -oE '/assets/[A-Za-z0-9._-]+\.js' | head -1)
+          asset=$(curl -fsS "$BASE/" | grep -oE '/assets/[A-Za-z0-9._-]+\.js' | head -1)
           failed=0
           for path in / /healthz "$asset"; do
-            headers=$(curl -fsS -D - -o /dev/null "http://localhost:3000$path")
+            headers=$(curl -fsS -D - -o /dev/null "$BASE$path")
             for header in X-Frame-Options X-Content-Type-Options Referrer-Policy; do
               if ! grep -qi "^$header:" <<< "$headers"; then
                 echo "$path is missing $header"
@@ -195,7 +202,7 @@ jobs:
       # conflicting X-Frame-Options values on one response.
       - name: The proxied API keeps exactly one set of its own
         run: |
-          count=$(curl -fsS -D - -o /dev/null http://localhost:3000/api/healthz \
+          count=$(curl -fsS -D - -o /dev/null "$BASE/api/healthz" \
             | grep -ci '^X-Frame-Options:')
           echo "X-Frame-Options appears $count time(s)"
           [ "$count" = "1" ]
@@ -204,12 +211,12 @@ jobs:
         run: |
           # Unproxied, this fell through to the SPA fallback and answered 200
           # with index.html whether or not the API was running.
-          curl -fsS http://localhost:3000/api/healthz | grep -q '"success":true'
+          curl -fsS "$BASE/api/healthz" | grep -q '"success":true'
 
       - name: The client route /health still reaches the app
         run: |
           # The probe must not take a path the app already uses for a page.
-          curl -fsS http://localhost:3000/health | grep -q '<div id="root">'
+          curl -fsS "$BASE/health" | grep -q '<div id="root">'
 
       - name: Tear down
         if: always()
