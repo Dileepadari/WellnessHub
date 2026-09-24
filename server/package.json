@@ -27,7 +27,7 @@
     "express",
     "mongodb"
   ],
-  "author": "WellnessHub Team",
+  "author": "Dileep Adari",
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {

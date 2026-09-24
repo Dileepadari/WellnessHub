@@ -17,8 +17,8 @@ const options = {
       version: '1.0.0',
       description: 'Comprehensive wellness platform API with gamification features',
       contact: {
-        name: 'WellnessHub Team',
-        email: 'api@wellnesshub.com'
+        name: 'Dileep Adari',
+        url: 'https://github.com/Dileepadari/WellnessHub'
       },
       license: {
         name: 'MIT',
@@ -27,10 +27,12 @@ const options = {
     },
     servers: [
       {
-        url: config.isProduction 
-          ? 'https://api.wellnesshub.com/api' 
-          : `http://localhost:${config.port}/api`,
-        description: config.isProduction ? 'Production server' : 'Development server'
+        // Relative in production: the API is served same-origin behind nginx,
+        // so "Try it out" hits whatever host the docs were opened on. An
+        // absolute URL here named a domain that is not the deployment, which
+        // made every request from this page fail against someone else's DNS.
+        url: config.isProduction ? '/api' : `http://localhost:${config.port}/api`,
+        description: config.isProduction ? 'This deployment' : 'Development server'
       }
     ],
     components: {

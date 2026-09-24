@@ -53,20 +53,43 @@ falls back to the root file; real process environment always wins over both.
 
 ## Architecture overview
 
+```mermaid
+flowchart TB
+  browser["Browser<br><small>React, one origin</small>"]
+
+  subgraph edge["nginx in production, Vite proxy in development"]
+    static["Static bundle<br><small>/ and /assets</small>"]
+    apiproxy["/api"]
+    wsproxy["/socket.io"]
+    probe["/api/healthz"]
+  end
+
+  subgraph api["Node container"]
+    express["Express app<br><small>src/app.js</small>"]
+    sockets["Socket.IO<br><small>src/socket.js</small>"]
+  end
+
+  mongo[("MongoDB")]
+
+  browser --> static
+  browser --> apiproxy
+  browser --> wsproxy
+  apiproxy --> express
+  wsproxy --> sockets
+  probe --> express
+  express --> mongo
+  sockets --> mongo
+  express -. "req.app.get('io')" .-> sockets
 ```
-Browser
-   |
-   |  same-origin /api and /socket.io
-   v
-nginx (production) / Vite dev proxy (development)
-   |
-   v
-Express app  ──  Socket.IO
-   |                 |
-   |   Mongoose      |  rooms: user-<id>, challenge-<id>, team-<id>
-   v                 |
-MongoDB  <───────────┘
-```
+
+Rooms are `user-<id>`, `challenge-<id>` and `team-<id>`. A socket joins its own user room from
+the verified token and never from client input; the other two are requested by the client and
+checked before the join (see **Realtime**).
+
+The static bundle and the API share one origin, so the browser never makes a cross-origin
+request. `/api/healthz` is the API's liveness probe and is proxied deliberately: the API's own
+endpoint is at `/health`, which is also a client route, so proxying that path would have taken
+the Health page away from users to give a probe a shorter URL.
 
 The client never talks to the API cross-origin. In development the Vite proxy forwards `/api`
 and `/socket.io` to `localhost:5000`; in production the frontend's nginx does the same to the
@@ -104,6 +127,16 @@ new code path can write a plain-text password.
 Two rate limiters: a global one over `/api` keyed by IP, and `rateLimitByUser(max, windowMs)` on
 expensive routes keyed by user id. `/health` sits above the limiter so a busy API cannot look
 dead to an orchestrator.
+
+`rateLimitByUser` keeps its counters in a closure `Map`. An entry is only revisited when that
+same user comes back, so it sweeps the whole map once per window: without that, one entry per
+user who ever touched the route stayed for the life of the process, and some of those windows
+are 24 hours long.
+
+`optionalAuth` sits beside `protect` for routes that are readable anonymously but show more to a
+signed-in viewer. `GET /api/users/:id` is the only one today. It matters that such a route uses
+it rather than nothing at all: `req.user` is otherwise always `undefined` there, so a branch
+testing it never runs and reads as working code.
 
 ## Data model
 
@@ -197,6 +230,55 @@ Two subtleties worth knowing:
 - **The current streak tolerates an unlogged today.** It counts back from today if today has
   activity, otherwise from yesterday, so a streak only breaks after a full day passes.
 
+```mermaid
+flowchart LR
+  subgraph written["What is written"]
+    act["Activity<br><small>type, value, at</small>"]
+    txn["Transaction<br><small>kind, amount, at, month</small>"]
+    pol["Policy"]
+    goal["Goal.contributions[]"]
+  end
+
+  subgraph derived["What is computed on read"]
+    totals["Daily and weekly totals"]
+    spark["Sparkline series"]
+    streak["Streaks"]
+    money["Income, expenses, savings rate"]
+    cat["Category breakdown"]
+    prem["Annual premium, coverage score"]
+    prog["Challenge progress"]
+    ach["Achievement unlocks"]
+  end
+
+  stored["User.totalPoints, level, experience<br><small>the one running total</small>"]
+
+  act --> totals --> spark
+  act --> streak
+  act --> prog
+  txn --> money
+  txn --> cat
+  txn --> prog
+  pol --> prem
+  goal --> prog
+  prog --> ach
+  act --> stored
+  ach --> stored
+```
+
+`User.totalPoints`, `level` and `experience` are the single exception: they are written, not
+derived, because they are a score. Everything else is recomputed, which is why correcting one
+entry corrects every figure that depends on it with no recalculation step.
+
+Two windows are deliberately not the dashboard's `period`:
+
+- The **monthly wealth series** spans six months whatever the period. Scoped to the period it
+  held one bucket at 7d and 30d, and the Overview draws its net-position sparkline only with
+  more than one point, so that chart could never appear on the default view.
+- **Nothing may be dated ahead of now.** The activity log has always refused it; transactions
+  did not, so one entry dated next year landed in a future month bucket and pulled the savings
+  rate and the prior-month averages with it. Both routes refuse it now, and the seed clamps to
+  the same cutoff rather than generating days that have not happened.
+
 ## Progression
 
 Logging one activity can advance a challenge, unlock an achievement and extend a streak at
@@ -234,6 +316,43 @@ cache being patched from a payload that could drift.
 One catch worth remembering: points, level and streak in the header come from `AuthContext.user`,
 not from a query, so a progression event calls `refreshUser()` as well as invalidating the
 cache. Invalidation alone leaves the header stale.
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant IO as Socket.IO
+  participant R as Route handler
+  participant DB as MongoDB
+
+  C->>IO: connect with auth.token
+  IO->>IO: verify JWT, set socket.userId
+  Note over IO: an unverified socket never connects,<br>so it can only ever be in its own room
+  IO->>IO: join user-<userId>
+
+  C->>IO: join-team teamId
+  IO->>DB: load team type and members
+  alt public, or an active member
+    IO->>IO: join team-<teamId>
+  else private and not a member
+    IO--xC: ignored
+    Note over IO: REST answers 403 for this team,<br>so the room has to refuse too
+  end
+
+  C->>R: POST /api/health/activities
+  R->>DB: write activity, recompute progression
+  R->>IO: io.to(user-<id>).emit(progression-updated)
+  IO-->>C: progression-updated
+  C->>R: refetch the affected queries
+  Note over C: the event says something changed,<br>never what it changed to
+```
+
+Two rules hold this together, and both were once broken:
+
+- **A room join is an authorisation decision.** `join-team` checked nothing, so a user the REST
+  route would refuse with a 403 could still sit in a private team's room and watch it.
+- **`friend-activity` goes to friends.** It was a `socket.broadcast.emit`, which is every
+  connected socket. It now fans out to the sender's friends and followers, the same audience
+  `POST /api/community/share` uses.
 
 ## API surface
 
@@ -278,7 +397,8 @@ bearer token is required.
 | GET | `/analytics/trends?period=` | yes | Daily points and per-metric series |
 | GET | `/analytics/admin/overview` | admin | Platform counts |
 
-Outside `/api`: `GET /health` is the liveness probe, `/api-docs` serves Swagger UI, and
+Outside `/api`: `GET /health` is the API's liveness probe (reached through the stack as
+`/api/healthz`, because `/health` is also a client route), `/api-docs` serves Swagger UI, and
 `/api-docs.json` the raw OpenAPI document.
 
 `client/src/services/api.ts` is the only module that knows these paths.
@@ -423,10 +543,17 @@ cp .env.example .env      # JWT_SECRET and MONGO_ROOT_PASSWORD are mandatory
 ./deploy.sh --clean       # remove containers, images and volumes first
 ```
 
-Three services: `mongodb`, `backend`, `frontend`. `backend` waits on the Mongo healthcheck.
-`frontend` is nginx serving the built client and proxying `/api` and `/socket.io` to `backend`,
-which is why the browser only ever sees one origin. Both images run as non-root; the server
-installs with `npm ci --omit=dev` and probes health with `node` rather than adding `curl`.
+Three services: `mongodb`, `backend`, `frontend`. Each waits on the one below it being
+**healthy**, not merely started, so nginx never begins proxying to an API that has not finished
+connecting to Mongo. `frontend` is nginx serving the built client and proxying `/api` and
+`/socket.io` to `backend`, which is why the browser only ever sees one origin. Both images run
+as non-root; the server installs with `npm ci --omit=dev` and probes health with `node` rather
+than adding `curl`.
+
+Healthchecks address `127.0.0.1`, never `localhost`. In these images `localhost` resolves to
+`::1` first while both servers listen on IPv4 only, so a probe on the name is refused and the
+container reports unhealthy while serving every request normally. A CI job asserts all three
+report healthy, because nothing else notices.
 
 The compose file maps Mongo's port to the host so a local `npm run dev` can share the database.
 Remove that mapping when deploying.
@@ -451,24 +578,85 @@ the bugs were:
 - **streaks** - the derivation itself, including the unlogged-today tolerance
 - **progression** - challenge measurement (count and frequency targets), completion awarding
   once and only once, and achievement unlocking with its idempotence and availability window
+- **users-routes** - the two endpoints that answered 404 for every caller, and the search term
+  that was handed to the regex engine verbatim
+- **socket** - handshake rejection, the team-room authorisation check, and who a
+  `friend-activity` event actually reaches
+- **rate-limit-by-user** - the limit itself, and the sweep that stops the counter map growing
+  for the life of the process
+- **analytics-series** - the monthly wealth series, which was scoped to the dashboard period and
+  so held one bucket on the default window
+- **wealth-future** - a transaction dated ahead of now, which the activity log has always
+  refused and this route did not
+
+Client tests cover `lib/` and `services/api.ts`, plus `Sparkline` (its scaling, including the
+flat series that used to be drawn along the floor), `ErrorBoundary` and `ThemeContext`.
 
 ```bash
-cd server && npm test    # 82 tests
-cd client && npm test    # 27 tests
+cd server && npm test        # 122 tests
+cd client && npm test        # 52 tests
+cd server && npm run test:ci # with the coverage floor
+cd client && npm run test:ci # with the coverage floor
 ```
+
+Every test added during this pass was run against the unfixed code first and watched to fail.
+A test written after the fix, never seen red, proves only that it runs.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs three jobs on every push and pull request: **server** (lint,
-then Jest with the mongod binary cached so CI does not re-download it each run), **client**
-(lint, typecheck, Vitest, and a production build to catch anything that only fails under
-Rollup), and **docker** (builds both images). Runs are cancelled when superseded by a newer
-push to the same branch.
+`.github/workflows/ci.yml` runs on push, on pull request and on `workflow_dispatch`. There is no
+schedule. Runs are cancelled when superseded by a newer push to the same branch.
 
-**The automated tests do not exercise the UI.** Every page was walked manually in Chrome
-against a seeded database, which is what caught the payload-shape mismatches. Repeat that after
-changing a page: `npm run seed`, sign in as `john@example.com / Password123!`, visit every
-route. The mobile breakpoint has not been verified in a real browser.
+| Job | What it proves |
+|---|---|
+| **server** (Node 20.19, 24) | Lint, then Jest with a coverage floor. The mongod binary is cached so CI does not re-download it every run |
+| **client** (Node 20.19, 24) | Lint, typecheck, Vitest with a coverage floor, then a production build to catch what only fails under Rollup |
+| **audit** (server, client) | `npm audit --audit-level=low` over the whole tree, dev included |
+| **docker** | Both images build |
+| **compose** | The stack comes up, and then the four assertions below |
+| **hygiene** | Plain ASCII, no entity forms of the same characters, nothing tracked that should not be |
+| **readme-images** | Every screenshot a README references exists |
+| **readme-pair** | `README-light.md` regenerates with no diff |
+
+Both matrices run the declared Node floor as well as current, because `engines.node` says
+`>=20` and testing only one of them checks half the claim.
+
+### Why the coverage floors are low, and what they are for
+
+Server coverage sits near 57%, client near 16%. Neither number is a quality bar and neither is
+presented as one: the pages and the data hooks have no tests at all, which the **Known gaps**
+section states plainly.
+
+The floors exist for the one thing a floor is uniquely good at. **Jest exits 0 when it collects
+no tests, and so does Vitest.** A suite that silently stopped running reports as a pass
+everywhere else in the pipeline; a coverage figure of zero against a floor does not. Each floor
+is set just under the current number, so it catches collapse rather than drift.
+
+### What the compose job checks that nothing else can
+
+Unit tests run against an in-memory MongoDB and the docker job only builds images. Neither would
+notice the deployed stack being wrong, and three real faults lived exactly there:
+
+- **Security headers reach the pages that need them.** nginx discards inherited `add_header`
+  directives in any location that declares one of its own. All three locations serving this
+  image's content set `Cache-Control` or `Content-Type`, so the server-level `X-Frame-Options`,
+  `X-Content-Type-Options` and `Referrer-Policy` reached none of them. `always` does not help;
+  it only governs error responses. The config read correctly the whole time.
+- **The proxied API keeps exactly one set of its own.** helmet sets these on the API, and a
+  second copy from nginx put two conflicting `X-Frame-Options` values on one response.
+- **`/api/healthz` reports the API, not the SPA shell.** Unproxied it fell through to the SPA
+  fallback and answered 200 with `index.html` whether or not the API was running.
+- **Every container reports healthy.** The frontend's healthcheck fetched `http://localhost/`,
+  which resolves to `::1` first while nginx listens on IPv4 only. The container served every
+  request normally and reported unhealthy for its entire life, which would have stalled anything
+  gating on it.
+
+### What CI still does not cover
+
+**The automated tests do not exercise the UI.** Every page was walked manually in Chrome against
+a seeded database, which is what caught the payload-shape mismatches, the future-dated seed
+rows and the wealth series that could never draw. Repeat that after changing a page:
+`npm run seed`, sign in as `john@example.com / Password123!`, visit every route.
 
 ## Conventions and traps
 
@@ -494,11 +682,36 @@ Things that have already caused bugs here:
   fixtures must set it explicitly.
 - **Declare static routes before parameterised ones.** Express matches in order, so
   `/challenges/trending`, `/featured` and `/mine` must sit above `/challenges/:id` or they are
-  swallowed and rejected as an invalid id.
+  swallowed and rejected as an invalid id. This trap was written down and the same bug was
+  still in `users.js`: `GET /friends` sat below `GET /:id`, so every call to it was matched as
+  `id = "friends"`, cast-failed, and answered `404 Resource not found`. Nothing caught it
+  because no test and no page called that endpoint.
+- **A guard must read a field the projection kept.** `GET /api/users/:id` selected a field list
+  that omitted `isActive` and `preferences`, then tested both. Mongoose returns `undefined` for
+  an unselected path rather than failing, so `!user.isActive` was always true and the endpoint
+  answered 404 for every user alive, while the privacy checks below it could never match either.
+  Reading a field is not enough; it has to be in the `select`.
+- **Never interpolate user input into a `$regex`.** `/users/search` passed the term straight
+  through, so `.*` matched every document and returned the whole user directory to a caller
+  with no credentials. Escape the metacharacters and cap the page size.
+- **When two paths remove or authorise the same thing, one of them knows less.** The event hub's
+  error path deleted a subscriber without the cleanup its normal path did; `join-team` skipped
+  the team-type check the REST route enforces. Route both through one function rather than
+  copying the second half into the first.
 - **Give the Sparkline room to shrink.** Its `width` is a drawing basis; `max-w-full` is what
   stops a 1200px chart forcing the whole page wider than a phone viewport.
 - **Wrap form rows.** A row of fixed-width fields that cannot wrap stretches its panel, and the
   panel header with it, past the viewport on mobile.
+- **A flat series has no range to scale against.** Falling back to a nominal range of 1 put
+  every point at the minimum, which is the bottom of the box, so a steady 90kg read as though
+  it had bottomed out. Mid-height is what "unchanged" looks like.
+- **Do not name a keyboard modifier you have not detected.** The palette hint was hard-coded to
+  the Mac symbol while the handler accepted either modifier, so it told every Linux and Windows
+  user the wrong key. `lib/platform.ts` decides.
+- **Browser storage is a convenience, never the source of truth.** It can throw outright in a
+  private window and its contents can be evicted underneath a live tab. The theme cycle re-read
+  it instead of using the state it already held, so a write that never landed sent the next step
+  off from somewhere the user had already moved on from.
 
 ## Known gaps
 
@@ -511,6 +724,17 @@ Things that have already caused bugs here:
   is never rolled up from members, so every team shows zero.
 - **No password reset delivery.** `/auth/forgot-password` issues a token and returns it in
   development; nothing emails it.
-- **Client tests cover logic, not components.** `lib/format.ts` and `services/api.ts` are
-  tested; no component is mounted. Page behaviour is verified by the manual browser pass
-  described under Testing.
+- **No page has a test.** `lib/`, `services/api.ts`, `Sparkline`, `ErrorBoundary` and
+  `ThemeContext` are covered; the eight pages and `hooks/useApi.ts` are not, which is most of
+  the client by line count. Page behaviour is verified only by the manual browser pass.
+- **The server's route coverage is thin.** `users.js`, `community.js` and `gamification.js` sit
+  well under half. Two endpoints in `users.js` answered 404 for every caller and 82 passing
+  tests said nothing, because neither route was ever called by a test or by the client.
+- **`join-challenge` does not check membership.** Unlike `join-team` it lets any authenticated
+  socket subscribe to a challenge room. That is consistent with REST, where any signed-in user
+  may join any active challenge, so there is nothing there a member could not already read.
+  Worth revisiting if private challenges are ever added.
+- **The `/api/users/search` endpoint needs no credentials.** The term is escaped and the page
+  size capped, so it can no longer return the whole directory, but an anonymous caller can
+  still look a name up. That matches `/community/leaderboard`, which is also public, and both
+  should probably be decided together.

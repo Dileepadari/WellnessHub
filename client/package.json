@@ -54,5 +54,7 @@
   },
   "overrides": {
     "js-yaml": "^4.3.2"
-  }
+  },
+  "author": "Dileep Adari",
+  "license": "MIT"
 }
