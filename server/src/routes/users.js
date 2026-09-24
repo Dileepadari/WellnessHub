@@ -1,10 +1,14 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { protect, rateLimitByUser } = require('../middleware/auth');
+const { protect, optionalAuth, rateLimitByUser } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+
+// Escapes every character the regex engine treats as syntax, so a search term
+// can only ever match itself.
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * @swagger
@@ -285,101 +289,32 @@ router.get('/search', async (req, res, next) => {
       });
     }
 
+    // The term is a substring to look for, not a pattern the caller gets to
+    // write. Passing it through raw let `.*` match every user and return the
+    // whole directory from an endpoint that needs no credentials, and handed a
+    // caller the regex engine to write catastrophic backtracking into.
+    const term = escapeRegExp(q.trim());
+    const max = Math.min(Math.max(Number.parseInt(limit, 10) || 10, 1), 50);
+
     const users = await User.find({
       $and: [
         { isActive: true },
         {
           $or: [
-            { username: { $regex: q.trim(), $options: 'i' } },
-            { firstName: { $regex: q.trim(), $options: 'i' } },
-            { lastName: { $regex: q.trim(), $options: 'i' } }
+            { username: { $regex: term, $options: 'i' } },
+            { firstName: { $regex: term, $options: 'i' } },
+            { lastName: { $regex: term, $options: 'i' } }
           ]
         }
       ]
     })
     .select('username firstName lastName avatar level totalPoints currentStreak')
-    .limit(parseInt(limit))
+    .limit(max)
     .sort({ totalPoints: -1 });
 
     res.status(200).json({
       success: true,
       data: users
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * @swagger
- * /api/users/{id}:
- *   get:
- *     summary: Get user by ID
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     responses:
- *       200:
- *         description: User found
- *       404:
- *         description: User not found
- */
-router.get('/:id', async (req, res, next) => {
-  try {
-    const user = await User.findById(req.params.id)
-      .select('username firstName lastName avatar level totalPoints currentStreak achievements teams')
-      .populate('achievements.achievementId', 'title description icon rarity')
-      .populate('teams.teamId', 'name avatar category');
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // Check privacy settings
-    if (user.preferences?.privacy?.profileVisibility === 'private') {
-      return res.status(403).json({
-        success: false,
-        message: 'This profile is private'
-      });
-    }
-
-    // Filter data based on privacy settings
-    const publicData = {
-      _id: user._id,
-      username: user.username,
-      avatar: user.avatar,
-      level: user.level,
-      totalPoints: user.totalPoints,
-      currentStreak: user.currentStreak
-    };
-
-    // Add more data if profile is public or user is viewing their own profile
-    if (user.preferences?.privacy?.profileVisibility === 'public' || 
-        (req.user && req.user._id.toString() === user._id.toString())) {
-      publicData.firstName = user.preferences?.privacy?.showRealName ? user.firstName : undefined;
-      publicData.lastName = user.preferences?.privacy?.showRealName ? user.lastName : undefined;
-      publicData.achievements = user.preferences?.privacy?.showAchievements ? user.achievements : [];
-      publicData.teams = user.teams;
-    }
-
-    res.status(200).json({
-      success: true,
-      data: publicData
     });
   } catch (error) {
     next(error);
@@ -411,6 +346,97 @@ router.get('/friends', protect, async (req, res, next) => {
         following: user.followedUsers,
         followers: user.followers.length // Don't populate followers for privacy
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get user by ID
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User found
+ *       404:
+ *         description: User not found
+ */
+router.get('/:id', optionalAuth, async (req, res, next) => {
+  try {
+    // isActive and preferences are read below, so they have to be in the
+    // projection. Leaving them out does not make the reads fail, it makes them
+    // undefined, which silently turned the isActive guard into "always 404"
+    // and the privacy checks into "never match".
+    const user = await User.findById(req.params.id)
+      .select(
+        'username firstName lastName avatar level totalPoints currentStreak ' +
+          'achievements teams friends isActive preferences'
+      )
+      .populate('achievements.achievementId', 'title description icon rarity')
+      .populate('teams.teamId', 'name avatar category');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const visibility = user.preferences?.privacy?.profileVisibility ?? 'friends';
+    const isSelf = req.user ? req.user._id.toString() === user._id.toString() : false;
+    // 'friends' is the default for every account, so it has to mean something:
+    // the detail block needs an actual friendship, not merely a signed-in viewer.
+    const isFriend = Boolean(
+      req.user && user.friends?.some((f) => f.toString() === req.user._id.toString())
+    );
+
+    // Check privacy settings. Your own profile stays readable to you.
+    if (visibility === 'private' && !isSelf) {
+      return res.status(403).json({
+        success: false,
+        message: 'This profile is private'
+      });
+    }
+
+    // Filter data based on privacy settings
+    const publicData = {
+      _id: user._id,
+      username: user.username,
+      avatar: user.avatar,
+      level: user.level,
+      totalPoints: user.totalPoints,
+      currentStreak: user.currentStreak
+    };
+
+    // Add more data if profile is public, the viewer is a friend, or the user
+    // is viewing their own profile.
+    if (visibility === 'public' || isSelf || (visibility === 'friends' && isFriend)) {
+      publicData.firstName = user.preferences?.privacy?.showRealName ? user.firstName : undefined;
+      publicData.lastName = user.preferences?.privacy?.showRealName ? user.lastName : undefined;
+      publicData.achievements = user.preferences?.privacy?.showAchievements ? user.achievements : [];
+      publicData.teams = user.teams;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: publicData
     });
   } catch (error) {
     next(error);
