@@ -46,11 +46,16 @@ export function Sparkline({
   const candidates = reference === null ? values : [...values, reference];
   const min = Math.min(...candidates);
   const max = Math.max(...candidates);
-  // A flat series would divide by zero; give it a nominal range so it draws mid-height.
+  // A flat series has no range to scale against. Falling back to a nominal
+  // range of 1 puts every point at the minimum, which is the bottom of the box:
+  // a steady 90kg then reads as though it had bottomed out. Mid-height is what
+  // "unchanged" should look like.
+  const flat = max === min;
   const range = max - min || 1;
 
   const stepX = values.length > 1 ? width / (values.length - 1) : 0;
-  const toY = (value: number) => height - ((value - min) / range) * (height - 2) - 1;
+  const toY = (value: number) =>
+    flat ? height / 2 : height - ((value - min) / range) * (height - 2) - 1;
 
   const points = values.map((value, i) => `${(i * stepX).toFixed(2)},${toY(value).toFixed(2)}`);
   const linePath = `M${points.join(' L')}`;

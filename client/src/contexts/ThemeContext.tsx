@@ -23,9 +23,25 @@ const NEXT: Record<Theme, Theme> = { light: 'dark', dark: 'system', system: 'lig
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Storage is a convenience here, never the source of truth. A browser can
+// refuse it outright (private mode, blocked site data) and throw on access, and
+// what it holds can be evicted underneath a live tab.
 const readStored = (): Theme => {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+  } catch {
+    return 'system';
+  }
+};
+
+const writeStored = (theme: Theme) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, theme);
+  } catch {
+    // The choice lasts for this page instead of across visits. Not worth
+    // breaking the button that was clicked.
+  }
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -34,10 +50,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);
-    localStorage.setItem(STORAGE_KEY, next);
+    writeStored(next);
   }, []);
 
-  const cycle = useCallback(() => setTheme(NEXT[readStored()]), [setTheme]);
+  // Steps from the theme actually in effect. Re-reading storage here meant a
+  // write that never landed, or a value evicted since, sent the next step off
+  // from somewhere the user had already moved on from.
+  const cycle = useCallback(() => setTheme(NEXT[theme]), [setTheme, theme]);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
