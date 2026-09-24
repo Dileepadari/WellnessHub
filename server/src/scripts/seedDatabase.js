@@ -153,11 +153,16 @@ const buildTransactions = (userId, monthlyIncome) => {
   for (let monthOffset = 5; monthOffset >= 0; monthOffset -= 1) {
     const base = new Date();
     base.setMonth(base.getMonth() - monthOffset, 1);
+    // Clamped for the same reason daysAgo is: in the current month every day
+    // after today is still a valid day-of-month, so an unclamped date puts
+    // salary and groceries in the future. They then sit outside any window
+    // ending at now, and the API's own rule refuses entries dated ahead.
     const inMonth = (dayOfMonth) => {
       const d = new Date(base);
       d.setDate(Math.min(dayOfMonth, 28));
       d.setHours(10, 0, 0, 0);
-      return d;
+      const cutoff = Date.now() - 60 * 1000;
+      return d.getTime() > cutoff ? new Date(cutoff) : d;
     };
 
     push('income', monthlyIncome, 'salary', 'Monthly salary', inMonth(1));

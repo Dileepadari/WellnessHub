@@ -157,6 +157,16 @@ router.post(
     if (rejectInvalid(req, res)) return;
     try {
       const at = req.body.at || new Date();
+
+      // The same rule the activity log enforces. Without it a transaction dated
+      // next year lands in a future month bucket and pulls the savings rate and
+      // the prior-month averages along with it.
+      if (at > new Date()) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Cannot record a transaction in the future' });
+      }
+
       const transaction = await Transaction.create({
         user: req.user._id,
         kind: req.body.kind,
