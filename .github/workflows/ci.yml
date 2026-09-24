@@ -151,6 +151,40 @@ jobs:
       - name: Client is served
         run: curl -fsS http://localhost:3000 > /dev/null
 
+      # nginx discards inherited add_header directives in any location that
+      # declares one of its own, so these went missing from every page and
+      # script while still being present and correct in nginx.conf. Nothing
+      # short of reading a real response catches that.
+      - name: Security headers reach the pages that need them
+        run: |
+          asset=$(curl -fsS http://localhost:3000/ | grep -oE '/assets/[A-Za-z0-9._-]+\.js' | head -1)
+          failed=0
+          for path in / /healthz "$asset"; do
+            headers=$(curl -fsS -D - -o /dev/null "http://localhost:3000$path")
+            for header in X-Frame-Options X-Content-Type-Options Referrer-Policy; do
+              if ! grep -qi "^$header:" <<< "$headers"; then
+                echo "$path is missing $header"
+                failed=1
+              fi
+            done
+          done
+          exit "$failed"
+
+      # helmet sets these on the API. A second copy from nginx put two
+      # conflicting X-Frame-Options values on one response.
+      - name: The proxied API keeps exactly one set of its own
+        run: |
+          count=$(curl -fsS -D - -o /dev/null http://localhost:3000/health \
+            | grep -ci '^X-Frame-Options:')
+          echo "X-Frame-Options appears $count time(s)"
+          [ "$count" = "1" ]
+
+      - name: The health endpoint reports the API, not the SPA shell
+        run: |
+          # Unproxied, /health fell through to the SPA fallback and answered 200
+          # with index.html whether or not the API was running.
+          curl -fsS http://localhost:3000/health | grep -q '"success":true'
+
       - name: Tear down
         if: always()
         run: docker compose down -v
