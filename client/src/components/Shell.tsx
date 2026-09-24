@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { formatNumber } from '@/lib/format';
 import type { User } from '@/types';
+import { shortcutModifier } from '@/lib/platform';
 
 export const NAV = [
   { to: '/', label: 'Overview', key: 'o' },
@@ -74,7 +75,7 @@ export function Shell({ user, onOpenPalette, children }: ShellProps) {
             title="Command palette"
           >
             <span className="text-fg-subtle">Search</span>
-            <kbd className="kbd ml-1">⌘K</kbd>
+            <kbd className="kbd ml-1">{shortcutModifier()} K</kbd>
           </button>
 
           <span className="hidden sm:flex items-center gap-1.5 px-2 border-l">
