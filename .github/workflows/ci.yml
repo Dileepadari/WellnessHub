@@ -171,13 +171,25 @@ jobs:
       # trap for anything that gates on health, and nothing else here notices.
       - name: Every container reports healthy
         run: |
-          failed=0
-          for name in wellnesshub-mongodb wellnesshub-backend wellnesshub-frontend; do
-            state=$(docker inspect "$name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}')
-            echo "$name: $state"
-            [ "$state" = "healthy" ] || failed=1
+          # Polled, not sampled once: the frontend's healthcheck has a start
+          # period and a 30s interval, so immediately after boot it can quite
+          # legitimately still read "starting" while serving every request.
+          for i in $(seq 1 90); do
+            pending=""
+            for name in wellnesshub-mongodb wellnesshub-backend wellnesshub-frontend; do
+              state=$(docker inspect "$name" \
+                --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}')
+              [ "$state" = "healthy" ] || pending="$pending $name=$state"
+            done
+            if [ -z "$pending" ]; then
+              echo "all three healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
           done
-          exit "$failed"
+          echo "still not healthy:$pending"
+          docker compose ps
+          exit 1
 
       # nginx discards inherited add_header directives in any location that
       # declares one of its own, so these went missing from every page and
