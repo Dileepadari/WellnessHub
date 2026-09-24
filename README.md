@@ -1,17 +1,40 @@
-<p align="center">
-  <img src="./client/src/assets/logo-mark.png" width="96" alt="ADK DEV">
-</p>
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/adk_dev_logo_light.png">
+  <img src="./docs/assets/adk_dev_logo_dark.png" width="150" alt="ADK DEV">
+</picture>
 
 # WellnessHub
 
-A keyboard-driven console for tracking health, money and insurance in one place, where
-looking after them earns points, streaks and levels.
+**A keyboard-driven console for tracking health, money and insurance in one place, where looking
+after them earns points, streaks and levels.**
+
+![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=000)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=fff)
+![Vite](https://img.shields.io/badge/Vite_7-646CFF?style=for-the-badge&logo=vite&logoColor=fff)
+![Tailwind](https://img.shields.io/badge/Tailwind-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=fff)
+
+![Express](https://img.shields.io/badge/Express_5-000000?style=for-the-badge&logo=express&logoColor=fff)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=fff)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=fff)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=fff)
+
+![Tests](https://img.shields.io/badge/tests-174_passing-3fb950?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
+
+[![CI](https://github.com/Dileepadari/WellnessHub/actions/workflows/ci.yml/badge.svg)](https://github.com/Dileepadari/WellnessHub/actions/workflows/ci.yml)
+
+**[Developer documentation](./DEVDOC.md)** &middot; [Getting started](#getting-started) &middot; [Features](#features)
+
+<p><b>Dark mode</b> &middot; <a href="./README-light.md">View this page in light mode</a></p>
+
+</div>
+
 
 Most trackers cover one of the three and present it as a wall of cards. WellnessHub treats
 them as one habit and shows them the way a trading terminal shows a portfolio: dense tables,
 tabular figures, inline sparklines, everything on one screen.
-
-For architecture, data model and setup, see **[DEVDOC.md](./DEVDOC.md)**.
 
 ## Features
 
@@ -43,7 +66,7 @@ For architecture, data model and setup, see **[DEVDOC.md](./DEVDOC.md)**.
 - Teams you can browse and join, an activity feed, and a points leaderboard
 
 ### Throughout
-- `⌘K` command palette for navigation and actions
+- `Ctrl K` (or `Cmd K`) command palette for navigation and actions
 - `g` then a section key to jump (`g h` for Health), `t` to cycle the theme
 - Live updates: completing a challenge or unlocking an achievement appears without a refresh
 - Light and dark from one palette, following your device by default

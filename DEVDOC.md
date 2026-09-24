@@ -738,3 +738,8 @@ Things that have already caused bugs here:
   size capped, so it can no longer return the whole directory, but an anonymous caller can
   still look a name up. That matches `/community/leaderboard`, which is also public, and both
   should probably be decided together.
+
+---
+
+The decisions behind these, including the ones that turned out wrong, are in
+[not_for_you.md](./not_for_you.md).
