@@ -281,7 +281,7 @@ export function Challenges() {
                   const isUnlocked = unlocked.has(achievement._id);
                   return (
                     <tr key={achievement._id} className={isUnlocked ? '' : 'opacity-55'}>
-                      <td className="text-center mono text-[11px]">{isUnlocked ? '✓' : '·'}</td>
+                      <td className="text-center mono text-[11px]">{isUnlocked ? '*' : '·'}</td>
                       <td>
                         <div className="font-medium">{achievement.title}</div>
                         {achievement.description && (

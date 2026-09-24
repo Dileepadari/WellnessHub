@@ -349,7 +349,7 @@ Handled in `AppShell` in `App.tsx`:
 | `⌘K` / `Ctrl+K` | Toggle the command palette, even from inside a field |
 | `g` then `o h w i c m a` | Jump to Overview, Health, Wealth, Insurance, Challenges, Community, Analytics |
 | `t` | Cycle theme light -> dark -> system |
-| `↑` `↓` `↵` `esc` | Move, run and close inside the palette |
+| `up` `down` `enter` `esc` | Move, run and close inside the palette |
 
 Single-key shortcuts are suppressed while an input, textarea or select has focus. The `g` chord
 listens for one following key and abandons after a second. Section keys live on the `NAV` table

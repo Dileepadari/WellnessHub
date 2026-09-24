@@ -128,11 +128,11 @@ export function CommandPalette({ open, onClose, extraCommands = [] }: CommandPal
 
         <footer className="flex items-center gap-3 px-3 h-7 border-t bg-bg-sunken">
           <span className="micro flex items-center gap-1">
-            <kbd className="kbd">↑</kbd>
-            <kbd className="kbd">↓</kbd> move
+            <kbd className="kbd">up</kbd>
+            <kbd className="kbd">down</kbd> move
           </span>
           <span className="micro flex items-center gap-1">
-            <kbd className="kbd">↵</kbd> run
+            <kbd className="kbd">enter</kbd> run
           </span>
           <span className="micro flex items-center gap-1">
             <kbd className="kbd">esc</kbd> close
