@@ -2,6 +2,8 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const config = require('./config/env');
 const logger = require('./utils/logger');
+const Team = require('./models/Team');
+const User = require('./models/User');
 
 const userRoom = (userId) => `user-${userId}`;
 const challengeRoom = (challengeId) => `challenge-${challengeId}`;
@@ -52,22 +54,59 @@ const createSocketServer = (httpServer) => {
       if (challengeId) socket.leave(challengeRoom(challengeId));
     });
 
-    socket.on('join-team', (teamId) => {
-      if (teamId) socket.join(teamRoom(teamId));
+    // REST refuses to add you to a team that is not public, so subscribing to
+    // its room must refuse too. Without this check a signed-in stranger could
+    // not join a private or corporate team but could still sit in its room and
+    // watch who did.
+    socket.on('join-team', async (teamId) => {
+      if (!teamId) return;
+      try {
+        const team = await Team.findById(teamId).select('type members');
+        if (!team) return;
+
+        const isMember = team.members.some(
+          (m) => m.status === 'active' && m.userId.toString() === socket.userId
+        );
+
+        if (team.type !== 'public' && !isMember) {
+          logger.debug(`Socket ${socket.id} refused room for team ${teamId}`);
+          return;
+        }
+
+        socket.join(teamRoom(teamId));
+      } catch (error) {
+        logger.error(`join-team failed for ${teamId}`, error.message);
+      }
     });
 
     socket.on('leave-team', (teamId) => {
       if (teamId) socket.leave(teamRoom(teamId));
     });
 
-    socket.on('activity-update', (data = {}) => {
+    socket.on('activity-update', async (data = {}) => {
       if (!data.activity) return;
-      // Attributed to the authenticated user, so a client cannot post as someone else.
-      socket.broadcast.emit('friend-activity', {
-        userId: socket.userId,
-        activity: data.activity,
-        timestamp: new Date().toISOString()
-      });
+      try {
+        // Attributed to the authenticated user, so a client cannot post as
+        // someone else. Sent to that user's friends and followers, the same
+        // audience POST /api/community/share uses: broadcasting it to every
+        // connected socket is what the event name already said it did not do.
+        const sender = await User.findById(socket.userId).select('friends followers');
+        if (!sender) return;
+
+        const audience = new Set(
+          [...sender.followers, ...sender.friends].map((id) => id.toString())
+        );
+
+        const payload = {
+          userId: socket.userId,
+          activity: data.activity,
+          timestamp: new Date().toISOString()
+        };
+
+        audience.forEach((id) => io.to(userRoom(id)).emit('friend-activity', payload));
+      } catch (error) {
+        logger.error(`activity-update failed for ${socket.userId}`, error.message);
+      }
     });
 
     socket.on('typing-start', (data = {}) => {
