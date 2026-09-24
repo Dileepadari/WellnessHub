@@ -21,7 +21,11 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
+# 127.0.0.1, not localhost: in this image localhost resolves to ::1 first and
+# nginx listens on IPv4 only, so wget was refused and the container reported
+# unhealthy for its whole life while serving every request normally. Anything
+# gating on this container being healthy would have waited forever.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/healthz || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1/healthz || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

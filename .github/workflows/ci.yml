@@ -151,6 +151,18 @@ jobs:
       - name: Client is served
         run: curl -fsS http://localhost:3000 > /dev/null
 
+      # A container that serves every request while reporting unhealthy is a
+      # trap for anything that gates on health, and nothing else here notices.
+      - name: Every container reports healthy
+        run: |
+          failed=0
+          for name in wellnesshub-mongodb wellnesshub-backend wellnesshub-frontend; do
+            state=$(docker inspect "$name" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}')
+            echo "$name: $state"
+            [ "$state" = "healthy" ] || failed=1
+          done
+          exit "$failed"
+
       # nginx discards inherited add_header directives in any location that
       # declares one of its own, so these went missing from every page and
       # script while still being present and correct in nginx.conf. Nothing
