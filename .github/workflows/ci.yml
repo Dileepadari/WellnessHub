@@ -174,16 +174,21 @@ jobs:
       # conflicting X-Frame-Options values on one response.
       - name: The proxied API keeps exactly one set of its own
         run: |
-          count=$(curl -fsS -D - -o /dev/null http://localhost:3000/health \
+          count=$(curl -fsS -D - -o /dev/null http://localhost:3000/api/healthz \
             | grep -ci '^X-Frame-Options:')
           echo "X-Frame-Options appears $count time(s)"
           [ "$count" = "1" ]
 
-      - name: The health endpoint reports the API, not the SPA shell
+      - name: The API liveness probe reports the API, not the SPA shell
         run: |
-          # Unproxied, /health fell through to the SPA fallback and answered 200
+          # Unproxied, this fell through to the SPA fallback and answered 200
           # with index.html whether or not the API was running.
-          curl -fsS http://localhost:3000/health | grep -q '"success":true'
+          curl -fsS http://localhost:3000/api/healthz | grep -q '"success":true'
+
+      - name: The client route /health still reaches the app
+        run: |
+          # The probe must not take a path the app already uses for a page.
+          curl -fsS http://localhost:3000/health | grep -q '<div id="root">'
 
       - name: Tear down
         if: always()
