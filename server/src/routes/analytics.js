@@ -23,6 +23,21 @@ const rejectInvalid = (req, res) => {
 
 const daysFromPeriod = (period) => ({ '7d': 7, '30d': 30, '90d': 90 })[period] ?? 30;
 
+// The monthly series has its own window, deliberately not the dashboard period.
+// Scoped to the period it held one bucket at 7d and 30d, and the Overview draws
+// its "net position by month" sparkline only when there is more than one point,
+// so on the default period that chart showed "not enough history" no matter how
+// much history the account had.
+const SERIES_MONTHS = 6;
+
+const startOfMonthsAgo = (months) => {
+  const d = new Date();
+  d.setUTCDate(1);
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCMonth(d.getUTCMonth() - months + 1);
+  return d;
+};
+
 /** Rank by total points: how many active users have strictly more. */
 const rankFor = async (userId) => {
   const user = await User.findById(userId).select('totalPoints');
@@ -68,7 +83,7 @@ router.get(
           streaksForUser(req.user._id),
           rankFor(req.user._id),
           healthService.totalsByType(req.user._id, from),
-          Transaction.monthlyTotals(req.user._id, from),
+          Transaction.monthlyTotals(req.user._id, startOfMonthsAgo(SERIES_MONTHS)),
           Policy.find({ user: req.user._id, status: 'active' }).lean(),
           Goal.find({ user: req.user._id, status: 'active' }),
           User.findById(req.user._id).select('totalPoints level experience achievements activeChallenges')
