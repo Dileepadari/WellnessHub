@@ -29,6 +29,12 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}', 'src/test/**'],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node }
+    },
+    rules: {
+      // Fast refresh is about hot-reloading the running app. Test files and
+      // their helpers are never hot-reloaded, so the rule only produces noise
+      // where a helper legitimately exports a component beside a function.
+      'react-refresh/only-export-components': 'off'
     }
   },
   {

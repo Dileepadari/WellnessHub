@@ -17,7 +17,15 @@ import {
   usePolicies,
   usePolicyTypes
 } from '@/hooks/useApi';
-import { formatCurrency, formatDate, formatNumber, humanise, pick, pickArray } from '@/lib/format';
+import {
+  formatCurrency,
+  formatDate,
+  formatNumber,
+  humanise,
+  pick,
+  pickArray,
+  sentenceCase
+} from '@/lib/format';
 
 interface Policy {
   _id: string;
@@ -246,7 +254,7 @@ export function Insurance() {
                         {alert.kind}
                       </span>
                     </td>
-                    <td className="font-medium whitespace-nowrap">{humanise(alert.title)}</td>
+                    <td className="font-medium whitespace-nowrap">{sentenceCase(alert.title)}</td>
                     <td className="text-fg-muted">{alert.detail}</td>
                     <td className="num text-fg-muted">
                       {alert.daysUntil === undefined ? '-' : alert.daysUntil}

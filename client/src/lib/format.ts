@@ -97,9 +97,22 @@ export function pickArray<T = unknown>(source: unknown, path: string): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
-/** Title-cases an API enum value for display: `missing_coverage` -> `Missing coverage`. */
+/**
+ * Title-cases an API enum value for display: `missing_coverage` -> `Missing
+ * coverage`, `semi-annual` -> `Semi annual`.
+ *
+ * Only for enum values. It replaces every hyphen with a space, so prose that
+ * contains one as a separator comes out with the separator silently gone. Use
+ * `sentenceCase` for a string the API already wrote as a sentence.
+ */
 export const humanise = (value: unknown): string => {
   if (typeof value !== 'string' || !value) return '-';
   const spaced = value.replace(/[_-]/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+};
+
+/** Capitalises the first letter and changes nothing else. */
+export const sentenceCase = (value: unknown): string => {
+  if (typeof value !== 'string' || !value) return '-';
+  return value.charAt(0).toUpperCase() + value.slice(1);
 };

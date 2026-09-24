@@ -147,7 +147,7 @@ export function Health() {
           onRetry={() => void summary.refetch()}
         >
           <div className="overflow-x-auto">
-            <table className="tbl">
+            <table className="tbl" aria-label="Health metrics">
               <thead>
                 <tr>
                   <th className="grow-col">Metric</th>
@@ -222,7 +222,7 @@ export function Health() {
             onRetry={() => void activities.refetch()}
           >
             <div className="overflow-x-auto max-h-80 overflow-y-auto">
-              <table className="tbl">
+              <table className="tbl" aria-label="Recent entries">
                 <thead className="sticky top-0">
                   <tr>
                     <th>When</th>

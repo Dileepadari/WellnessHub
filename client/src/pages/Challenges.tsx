@@ -122,7 +122,7 @@ export function Challenges() {
           onRetry={() => void myChallenges.refetch()}
         >
           <div className="overflow-x-auto">
-            <table className="tbl">
+            <table className="tbl" aria-label="Your challenges">
               <thead>
                 <tr>
                   <th className="grow-col">Challenge</th>
@@ -196,7 +196,7 @@ export function Challenges() {
           onRetry={() => void challenges.refetch()}
         >
           <div className="overflow-x-auto">
-            <table className="tbl">
+            <table className="tbl" aria-label="Browse challenges">
               <thead>
                 <tr>
                   <th className="grow-col">Challenge</th>
@@ -266,7 +266,7 @@ export function Challenges() {
           onRetry={() => void achievements.refetch()}
         >
           <div className="overflow-x-auto">
-            <table className="tbl">
+            <table className="tbl" aria-label="Achievements">
               <thead>
                 <tr>
                   <th className="w-8" />

@@ -20,7 +20,7 @@ after them earns points, streaks and levels.**
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=fff)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=fff)
 
-![Tests](https://img.shields.io/badge/tests-174_passing-3fb950?style=for-the-badge)
+![Tests](https://img.shields.io/badge/tests-221_passing-3fb950?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
 
 [![CI](https://github.com/Dileepadari/WellnessHub/actions/workflows/ci.yml/badge.svg)](https://github.com/Dileepadari/WellnessHub/actions/workflows/ci.yml)

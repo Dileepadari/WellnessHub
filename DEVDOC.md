@@ -589,12 +589,25 @@ the bugs were:
 - **wealth-future** - a transaction dated ahead of now, which the activity log has always
   refused and this route did not
 
-Client tests cover `lib/` and `services/api.ts`, plus `Sparkline` (its scaling, including the
-flat series that used to be drawn along the floor), `ErrorBoundary` and `ThemeContext`.
+Client tests cover `lib/` and `services/api.ts`, `Sparkline` (its scaling, including the flat
+series that used to be drawn along the floor), `ErrorBoundary`, `ThemeContext`, and **every one
+of the eight pages**.
+
+The page tests stub `fetch`, not the hooks. That keeps the whole read path under test:
+`ApiService` shapes the request and unwraps the envelope, `useApi` caches it, and the page picks
+fields out of the payload. That last step is where the bugs were, and mocking the hooks would
+skip exactly it. `src/test/harness.tsx` provides `stubFetch` and `renderPage`; an unmatched
+request throws rather than resolving empty, because a page quietly rendering its empty state is
+the failure these tests exist to catch.
+
+Writing them turned up three payload shapes I had wrong, which is the point: `/community/teams`
+returns its array as `data` directly, insurance alerts carry `title` and `daysUntil` rather than
+`item` and `days`, and the joined and unlocked sets come from the auth user rather than from the
+endpoints that look like they would supply them.
 
 ```bash
 cd server && npm test        # 122 tests
-cd client && npm test        # 52 tests
+cd client && npm test        # 99 tests
 cd server && npm run test:ci # with the coverage floor
 cd client && npm run test:ci # with the coverage floor
 ```
@@ -621,11 +634,10 @@ schedule. Runs are cancelled when superseded by a newer push to the same branch.
 Both matrices run the declared Node floor as well as current, because `engines.node` says
 `>=20` and testing only one of them checks half the claim.
 
-### Why the coverage floors are low, and what they are for
+### What the coverage floors are for
 
-Server coverage sits near 57%, client near 16%. Neither number is a quality bar and neither is
-presented as one: the pages and the data hooks have no tests at all, which the **Known gaps**
-section states plainly.
+Server coverage sits near 57%, client near 57%, the client figure measured across all of `src`
+rather than the files a test happens to import. Neither is presented as a quality bar.
 
 The floors exist for the one thing a floor is uniquely good at. **Jest exits 0 when it collects
 no tests, and so does Vitest.** A suite that silently stopped running reports as a pass
@@ -724,9 +736,11 @@ Things that have already caused bugs here:
   is never rolled up from members, so every team shows zero.
 - **No password reset delivery.** `/auth/forgot-password` issues a token and returns it in
   development; nothing emails it.
-- **No page has a test.** `lib/`, `services/api.ts`, `Sparkline`, `ErrorBoundary` and
-  `ThemeContext` are covered; the eight pages and `hooks/useApi.ts` are not, which is most of
-  the client by line count. Page behaviour is verified only by the manual browser pass.
+- **`AuthContext` and `useLiveUpdates` have no tests.** Every page does, but these two are
+  mocked out by the page tests rather than exercised, so the session lifecycle and the socket
+  subscription are still only covered by the manual browser pass.
+- **The page tests assert reads, not writes.** Forms are filled and submitted in a few places,
+  but most mutations are not driven end to end.
 - **The server's route coverage is thin.** `users.js`, `community.js` and `gamification.js` sit
   well under half. Two endpoints in `users.js` answered 404 for every caller and 82 passing
   tests said nothing, because neither route was ever called by a test or by the client.

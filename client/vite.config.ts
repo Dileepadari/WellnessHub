@@ -51,15 +51,15 @@ export default defineConfig({
       // to the point, would still read as a pass if the suite ran nothing.
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/test/**', 'src/main.tsx', 'src/types/**', 'src/**/*.test.{ts,tsx}'],
-      // Set just under the current figures. The number is low because the
-      // pages and the data hooks have no tests at all - see DEVDOC. What the
-      // floor is for is the case a floor is uniquely good at catching: a suite
+      // Set just under the current figures, measured across all of src rather
+      // than the files a test happens to import. The floor is not a quality bar;
+      // it is here for the case a floor is uniquely good at catching: a suite
       // that exits 0 having run nothing, which reports as a pass everywhere else.
       thresholds: {
-        statements: 14,
-        branches: 16,
-        functions: 9,
-        lines: 14
+        statements: 50,
+        branches: 55,
+        functions: 45,
+        lines: 52
       }
     }
   }

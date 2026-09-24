@@ -9,6 +9,7 @@ import {
   formatNumber,
   formatPercent,
   humanise,
+  sentenceCase,
   pick,
   pickArray
 } from './format';
@@ -97,5 +98,28 @@ describe('pickArray', () => {
     expect(pickArray({ data: { rows: { nested: true } } }, 'data.rows')).toEqual([]);
     expect(pickArray({ data: { rows: 'oops' } }, 'data.rows')).toEqual([]);
     expect(pickArray(null, 'data.rows')).toEqual([]);
+  });
+});
+
+describe('sentenceCase', () => {
+  it('capitalises the first letter only', () => {
+    expect(sentenceCase('health renewal - BlueShield')).toBe('Health renewal - BlueShield');
+  });
+
+  it('leaves a separator alone, unlike humanise', () => {
+    // humanise replaces every hyphen with a space, which is right for
+    // `semi-annual` and wrong for prose the API already wrote out.
+    expect(humanise('health renewal - BlueShield')).not.toContain('-');
+    expect(sentenceCase('health renewal - BlueShield')).toContain(' - ');
+  });
+
+  it('still humanises an enum', () => {
+    expect(humanise('semi-annual')).toBe('Semi annual');
+    expect(humanise('missing_coverage')).toBe('Missing coverage');
+  });
+
+  it('returns a dash for a non-string', () => {
+    expect(sentenceCase(null)).toBe('-');
+    expect(sentenceCase('')).toBe('-');
   });
 });

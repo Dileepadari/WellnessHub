@@ -214,7 +214,7 @@ function Goals() {
         onRetry={() => void goals.refetch()}
       >
         <div className="overflow-x-auto">
-          <table className="tbl">
+          <table className="tbl" aria-label="Goals">
             <thead>
               <tr>
                 <th className="grow-col">Goal</th>
@@ -395,7 +395,7 @@ export function Wealth() {
             onRetry={() => void summary.refetch()}
           >
             <div className="overflow-x-auto">
-              <table className="tbl">
+              <table className="tbl" aria-label="Spend by category">
                 <thead>
                   <tr>
                     <th className="grow-col">Category</th>
@@ -440,7 +440,7 @@ export function Wealth() {
             onRetry={() => void transactions.refetch()}
           >
             <div className="max-h-96 overflow-auto">
-              <table className="tbl">
+              <table className="tbl" aria-label="Transactions">
                 <thead className="sticky top-0">
                   <tr>
                     <th>Date</th>

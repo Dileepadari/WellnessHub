@@ -119,7 +119,7 @@ function Teams() {
         onRetry={() => void teams.refetch()}
       >
         <div className="overflow-x-auto">
-          <table className="tbl">
+          <table className="tbl" aria-label="Teams">
             <thead>
               <tr>
                 <th className="grow-col">Team</th>
@@ -216,7 +216,7 @@ export function Community() {
             onRetry={() => void feed.refetch()}
           >
             <div className="max-h-[420px] overflow-auto">
-              <table className="tbl">
+              <table className="tbl" aria-label="Activity feed">
                 <thead className="sticky top-0">
                   <tr>
                     <th>Who</th>
@@ -257,7 +257,7 @@ export function Community() {
             onRetry={() => void leaderboard.refetch()}
           >
             <div className="max-h-[420px] overflow-auto">
-              <table className="tbl">
+              <table className="tbl" aria-label="Leaderboard">
                 <thead className="sticky top-0">
                   <tr>
                     <th className="w-10 text-right">#</th>
