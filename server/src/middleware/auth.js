@@ -53,6 +53,30 @@ const protect = async (req, res, next) => {
   }
 };
 
+// Populates req.user when a valid token is present and is a no-op otherwise.
+// Routes that are readable anonymously but show more to a signed-in viewer use
+// this: without it req.user is always undefined there, and any branch that
+// tests it is dead code.
+const optionalAuth = async (req, res, next) => {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(header.slice(7), config.jwtSecret);
+    const user = await User.findById(decoded.id).select('-password');
+    if (user && user.isActive) {
+      req.user = user;
+    }
+  } catch {
+    // An invalid token on an optional route is the same as no token. Routes
+    // that must reject it use protect instead.
+  }
+
+  next();
+};
+
 // Grant access to specific roles
 const authorize = (...roles) => {
   return (req, res, next) => {
@@ -77,8 +101,26 @@ const authorize = (...roles) => {
 // Rate limiting for specific actions
 const rateLimitByUser = (maxRequests = 10, windowMs = 15 * 60 * 1000) => {
   const userRequests = new Map();
+  let lastSweep = Date.now();
 
-  return (req, res, next) => {
+  // A user's entry is only ever revisited when that same user comes back, so
+  // someone who makes one request and never returns would sit in the map for
+  // the life of the process. Windows here go up to 24 hours, so that is a long
+  // time to hold an entry per user who ever touched the route. Sweeping the
+  // whole map once per window keeps it proportional to recent traffic rather
+  // than to every user who has ever signed in. No timer, so nothing to unref
+  // and nothing that keeps the process alive.
+  const sweep = (now) => {
+    lastSweep = now;
+    const cutoff = now - windowMs;
+    for (const [id, times] of userRequests) {
+      if (times.length === 0 || times[times.length - 1] <= cutoff) {
+        userRequests.delete(id);
+      }
+    }
+  };
+
+  const middleware = (req, res, next) => {
     if (!req.user) {
       return next();
     }
@@ -86,6 +128,10 @@ const rateLimitByUser = (maxRequests = 10, windowMs = 15 * 60 * 1000) => {
     const userId = req.user._id.toString();
     const now = Date.now();
     const windowStart = now - windowMs;
+
+    if (now - lastSweep >= windowMs) {
+      sweep(now);
+    }
 
     // Clean old entries
     if (userRequests.has(userId)) {
@@ -108,6 +154,12 @@ const rateLimitByUser = (maxRequests = 10, windowMs = 15 * 60 * 1000) => {
     userRequestList.push(now);
     next();
   };
+
+  // Exposed so the leak that prompted the sweep can be asserted on directly.
+  middleware.trackedUsers = () => userRequests.size;
+  middleware.sweepNow = () => sweep(Date.now());
+
+  return middleware;
 };
 
 // Middleware to validate resource exists
@@ -145,6 +197,7 @@ const validateResource = (Model, paramName = 'id') => {
 
 module.exports = {
   protect,
+  optionalAuth,
   authorize,
   rateLimitByUser,
   validateResource
