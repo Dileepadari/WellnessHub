@@ -1,3 +1,10 @@
+/**
+ * The landing screen: one panel per module, each a summary with a way in.
+ *
+ * Everything on this page comes from the single dashboard endpoint rather than
+ * one request per module, so the figures are consistent with each other and
+ * the screen settles in one paint.
+ */
 import { Link } from 'react-router-dom';
 import { Panel, PanelState } from '@/components/Panel';
 import { Sparkline } from '@/components/Sparkline';

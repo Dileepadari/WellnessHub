@@ -1,3 +1,9 @@
+/**
+ * The MongoDB connection and its lifecycle.
+ *
+ * Kept apart from src/app.js so the app can be mounted in tests against an
+ * in-memory server without this module ever running.
+ */
 const mongoose = require('mongoose');
 const config = require('./env');
 const logger = require('../utils/logger');

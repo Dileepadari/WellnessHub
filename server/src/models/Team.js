@@ -1,3 +1,10 @@
+/**
+ * A group of users with a shared score.
+ *
+ * `type` governs who may join: only a public team accepts an unsolicited join,
+ * and both the REST route and the Socket.IO room check it. A private team whose
+ * membership leaks over one of those paths is not private.
+ */
 const mongoose = require('mongoose');
 
 const teamSchema = new mongoose.Schema({

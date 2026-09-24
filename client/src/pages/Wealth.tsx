@@ -1,3 +1,10 @@
+/**
+ * Income against expenses, spending by category, goals and the ledger.
+ *
+ * The figures are aggregated by the API from the transactions rather than kept
+ * as running totals, so correcting an entry corrects everything derived from
+ * it without a recalculation step.
+ */
 import { useState, type FormEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Panel, PanelState } from '@/components/Panel';

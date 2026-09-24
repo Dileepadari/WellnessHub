@@ -1,3 +1,9 @@
+/**
+ * The health module: current metrics against their goals, and the entry log.
+ *
+ * Logging a metric and seeing the totals move is the core loop here, so the
+ * form and the recent entries sit on one screen rather than behind a dialog.
+ */
 import { useState, type FormEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Panel, PanelState } from '@/components/Panel';

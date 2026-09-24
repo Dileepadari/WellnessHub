@@ -1,3 +1,6 @@
+/**
+ * Covers policies, the coverage score and the renewal and gap alerts.
+ */
 const request = require('supertest');
 const { app, registerUser } = require('./helpers');
 

@@ -1,3 +1,10 @@
+/**
+ * A small levelled logger writing to stdout and, when it can, to a file.
+ *
+ * Deliberately not a logging library: the app needs levels, timestamps and a
+ * file it can tail, and nothing else. File logging is best-effort, so a
+ * read-only filesystem degrades to stdout instead of failing to boot.
+ */
 const fs = require('fs');
 const path = require('path');
 const config = require('../config/env');

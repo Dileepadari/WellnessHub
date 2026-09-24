@@ -1,3 +1,10 @@
+/**
+ * Trends over a chosen window: points earned, entries logged, metric series.
+ *
+ * Every figure is read from the API for the selected period rather than
+ * derived in the browser from a longer series, so what the page shows is what
+ * the server would report for that window.
+ */
 import { useState } from 'react';
 import { Panel, PanelState } from '@/components/Panel';
 import { Sparkline } from '@/components/Sparkline';

@@ -1,3 +1,10 @@
+/**
+ * Profile, goals and appearance.
+ *
+ * Goals belong here rather than on the Health page because changing one
+ * rewrites every progress figure derived from it, which is a settings-shaped
+ * act rather than part of logging a day.
+ */
 import { useState, type FormEvent } from 'react';
 import { Panel } from '@/components/Panel';
 import { useAuth } from '@/contexts/AuthContext';

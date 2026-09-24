@@ -1,3 +1,10 @@
+/**
+ * Sign in and sign up, on one screen with a mode switch.
+ *
+ * One screen rather than two routes because the two forms differ only by three
+ * fields, and a user who picked the wrong one should not lose what they typed
+ * to a navigation.
+ */
 import { useState, type FormEvent } from 'react';
 import logoMark from '@/assets/logo-mark.png';
 import { useAuth } from '@/contexts/AuthContext';

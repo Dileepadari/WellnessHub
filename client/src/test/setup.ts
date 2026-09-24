@@ -1,3 +1,10 @@
+/**
+ * Test environment setup, loaded before every suite.
+ *
+ * Clearing localStorage after each test matters here because the theme and the
+ * session token both live there, so a leaked value would carry a signed-in or
+ * light-mode state into the next test.
+ */
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';

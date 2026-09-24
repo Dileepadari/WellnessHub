@@ -1,3 +1,9 @@
+/**
+ * Shared test fixtures: the mounted app and a registered user with a token.
+ *
+ * Registration goes through the real route rather than inserting a document,
+ * so a test's user is hashed, validated and shaped exactly like a real one.
+ */
 const request = require('supertest');
 const createApp = require('../src/app');
 

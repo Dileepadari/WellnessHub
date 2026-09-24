@@ -1,3 +1,7 @@
+/**
+ * Covers the theme cycle and the two ways browser storage lets it down:
+ * a value that vanishes underneath a live tab, and a write that throws.
+ */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

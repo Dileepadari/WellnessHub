@@ -1,3 +1,9 @@
+/**
+ * A badge a user can unlock, and the rule that unlocks it.
+ *
+ * The criteria live on the document rather than in code so a new achievement
+ * is a row, not a deploy. src/services/achievements.js evaluates them.
+ */
 const mongoose = require('mongoose');
 
 const achievementSchema = new mongoose.Schema({

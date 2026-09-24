@@ -1,3 +1,11 @@
+/**
+ * The last handler in the stack: turns a thrown error into a JSON response.
+ *
+ * Mongoose and jsonwebtoken throw errors whose names are stable but whose
+ * messages are not fit to show a caller, so each known name is mapped to a
+ * status and a sentence of our own. Anything unrecognised becomes a 500 with a
+ * generic message, and the stack is attached only in development.
+ */
 const config = require('../config/env');
 const logger = require('../utils/logger');
 

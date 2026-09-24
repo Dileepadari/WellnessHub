@@ -1,3 +1,6 @@
+/**
+ * Covers the API client's request shaping and its handling of a failed call.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, apiService } from './api';
 

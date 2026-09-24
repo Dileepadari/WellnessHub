@@ -1,3 +1,10 @@
+/**
+ * Who is signed in, and the operations that change that.
+ *
+ * The token lives in apiService, not here: this context holds the user object
+ * the UI renders and stays a thin layer over the API client, so there is one
+ * place a session is established and one place it is torn down.
+ */
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { apiService } from '@/services/api';

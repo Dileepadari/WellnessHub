@@ -1,3 +1,10 @@
+/**
+ * The OpenAPI document, built from the JSDoc blocks on the route files.
+ *
+ * Generating it from the routes rather than maintaining a separate spec is the
+ * point: a documented endpoint that no longer exists shows up as a missing
+ * block next to the handler, not as a spec that drifted quietly.
+ */
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const config = require('./env');

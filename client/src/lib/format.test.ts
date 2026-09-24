@@ -1,3 +1,6 @@
+/**
+ * Covers the formatting and safe-read helpers every page depends on.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   formatCompact,

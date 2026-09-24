@@ -1,3 +1,10 @@
+/**
+ * The frame every page renders inside: brand, navigation, and the header strip.
+ *
+ * NAV is exported because it is also the source of the keyboard shortcuts in
+ * App.tsx. Keeping one table means a new route cannot arrive with a nav entry
+ * and no shortcut, or the reverse.
+ */
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';

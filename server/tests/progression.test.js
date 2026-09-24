@@ -1,3 +1,6 @@
+/**
+ * Covers points, levels and the achievements unlocked from logged activity.
+ */
 const request = require('supertest');
 const { app, registerUser } = require('./helpers');
 const User = require('../src/models/User');

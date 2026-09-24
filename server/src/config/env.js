@@ -1,3 +1,10 @@
+/**
+ * Every environment value the app reads, resolved once at startup.
+ *
+ * Nothing else in the codebase touches process.env. That is what makes a
+ * misconfigured deployment fail here, on boot, with a message naming the
+ * missing key, rather than on the first request that happens to need it.
+ */
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');

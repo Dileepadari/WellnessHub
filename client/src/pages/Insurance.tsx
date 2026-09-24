@@ -1,3 +1,10 @@
+/**
+ * Policies held, what they cost, and where the cover has gaps.
+ *
+ * The alerts panel leads because it is the only part that is time-sensitive: a
+ * renewal inside the window and a missing policy type are both things a user
+ * needs to act on rather than read.
+ */
 import { useState, type FormEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Panel, PanelState } from '@/components/Panel';

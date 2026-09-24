@@ -1,3 +1,6 @@
+/**
+ * Covers transactions, the monthly aggregation and savings goals.
+ */
 const request = require('supertest');
 const { app, registerUser } = require('./helpers');
 

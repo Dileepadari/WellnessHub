@@ -1,3 +1,9 @@
+/**
+ * Jest setup: an in-memory MongoDB for the suite, emptied between tests.
+ *
+ * Env is set here, before anything requires src/config/env.js, because that
+ * module reads process.env once at load and throws on a missing key.
+ */
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 

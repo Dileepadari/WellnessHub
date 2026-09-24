@@ -1,3 +1,10 @@
+/**
+ * A time-boxed goal users opt into, and the participants working on it.
+ *
+ * Participant progress is stored here rather than derived on read because a
+ * challenge measures a window that has closed: recomputing it later against
+ * current activity would quietly change a finished result.
+ */
 const mongoose = require('mongoose');
 
 const challengeSchema = new mongoose.Schema({

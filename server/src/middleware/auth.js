@@ -1,3 +1,11 @@
+/**
+ * Everything that decides who the caller is and what they may do.
+ *
+ * protect and optionalAuth both resolve a token to a user; the difference is
+ * whether a missing or bad one ends the request. Routes readable anonymously
+ * but richer when signed in need optionalAuth, because without it req.user is
+ * always undefined and any branch testing it is dead code.
+ */
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config/env');

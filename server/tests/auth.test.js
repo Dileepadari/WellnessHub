@@ -1,3 +1,6 @@
+/**
+ * Covers registration, sign-in and the protected-route guard.
+ */
 const request = require('supertest');
 const User = require('../src/models/User');
 const { app, DEFAULT_USER: validUser } = require('./helpers');

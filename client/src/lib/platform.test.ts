@@ -1,3 +1,6 @@
+/**
+ * Covers the modifier-key label across platforms.
+ */
 import { describe, it, expect } from 'vitest';
 import { isApplePlatform, shortcutModifier } from './platform';
 

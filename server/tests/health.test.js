@@ -1,3 +1,6 @@
+/**
+ * Covers logging a health metric and the totals derived from the log.
+ */
 const request = require('supertest');
 const createApp = require('../src/app');
 const Activity = require('../src/models/Activity');

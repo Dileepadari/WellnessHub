@@ -1,3 +1,6 @@
+/**
+ * Covers the boundary's three states: children, caught error, and recovery.
+ */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
