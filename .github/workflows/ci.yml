@@ -275,5 +275,8 @@ jobs:
 
       - name: Regenerate and diff
         run: |
+          # git diff on an untracked path exits 0, so a missing light page
+          # would sail through this job without being checked at all.
+          git ls-files --error-unmatch README-light.md > /dev/null
           node scripts/build-light-readme.mjs
           git diff --exit-code README-light.md
