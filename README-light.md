@@ -1,3 +1,5 @@
+<!-- Generated from README.md by scripts/build-light-readme.mjs. Do not edit by hand. -->
+
 <div align="center">
 
 <picture>
@@ -27,7 +29,7 @@ after them earns points, streaks and levels.**
 
 **[Developer documentation](./DEVDOC.md)** &middot; [Getting started](#getting-started) &middot; [Features](#features)
 
-<p><b>Dark mode</b> &middot; <a href="./README-light.md">View this page in light mode</a></p>
+<p><b>Light mode</b> &middot; <a href="./README.md">View this page in dark mode</a></p>
 
 </div>
 
@@ -41,39 +43,39 @@ tabular figures, inline sparklines, everything on one screen.
 <table>
 <tr>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/01-overview.png" alt="Overview">
+<img src="./docs/screenshots/light/01-overview.png" alt="Overview">
 <p align="center"><b>Overview</b><br><sub>One panel per module, from a single dashboard call</sub></p>
 </td>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/02-health.png" alt="Health">
+<img src="./docs/screenshots/light/02-health.png" alt="Health">
 <p align="center"><b>Health</b><br><sub>Metrics against goals, with the log that produced them</sub></p>
 </td>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/03-wealth.png" alt="Wealth">
+<img src="./docs/screenshots/light/03-wealth.png" alt="Wealth">
 <p align="center"><b>Wealth</b><br><sub>Six months of income against expenses, and the ledger</sub></p>
 </td>
 </tr>
 <tr>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/04-insurance.png" alt="Insurance">
+<img src="./docs/screenshots/light/04-insurance.png" alt="Insurance">
 <p align="center"><b>Insurance</b><br><sub>Premiums annualised so policies are comparable</sub></p>
 </td>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/05-challenges.png" alt="Challenges">
+<img src="./docs/screenshots/light/05-challenges.png" alt="Challenges">
 <p align="center"><b>Challenges</b><br><sub>Progress measured from the log, never self-reported</sub></p>
 </td>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/06-community.png" alt="Community">
+<img src="./docs/screenshots/light/06-community.png" alt="Community">
 <p align="center"><b>Community</b><br><sub>Feed, leaderboard and teams</sub></p>
 </td>
 </tr>
 <tr>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/07-analytics.png" alt="Analytics">
+<img src="./docs/screenshots/light/07-analytics.png" alt="Analytics">
 <p align="center"><b>Analytics</b><br><sub>Points, consistency and per-metric trends</sub></p>
 </td>
 <td width="33%" valign="top">
-<img src="./docs/screenshots/dark/08-settings.png" alt="Settings">
+<img src="./docs/screenshots/light/08-settings.png" alt="Settings">
 <p align="center"><b>Settings</b><br><sub>Goals live here: changing one rewrites every figure from it</sub></p>
 </td>
 <td width="33%" valign="top">
