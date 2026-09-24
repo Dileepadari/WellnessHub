@@ -68,6 +68,14 @@
       "src/**/*.js",
       "!src/scripts/**"
     ],
-    "testTimeout": 30000
+    "testTimeout": 30000,
+    "coverageThreshold": {
+      "global": {
+        "statements": 50,
+        "branches": 35,
+        "functions": 45,
+        "lines": 50
+      }
+    }
   }
 }

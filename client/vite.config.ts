@@ -42,6 +42,25 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    css: false
+    css: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      // Every source file counts, not only the ones a test happens to import.
+      // Reporting on the imported set alone would flatter the number and, more
+      // to the point, would still read as a pass if the suite ran nothing.
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/test/**', 'src/main.tsx', 'src/types/**', 'src/**/*.test.{ts,tsx}'],
+      // Set just under the current figures. The number is low because the
+      // pages and the data hooks have no tests at all - see DEVDOC. What the
+      // floor is for is the case a floor is uniquely good at catching: a suite
+      // that exits 0 having run nothing, which reports as a pass everywhere else.
+      thresholds: {
+        statements: 14,
+        branches: 16,
+        functions: 9,
+        lines: 14
+      }
+    }
   }
 });

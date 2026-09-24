@@ -4,6 +4,7 @@ on:
   push:
     branches: [master, main]
   pull_request:
+  workflow_dispatch:
 
 # A new push to the same branch supersedes the previous run.
 concurrency:
@@ -12,8 +13,14 @@ concurrency:
 
 jobs:
   server:
-    name: Server
+    name: Server - Node ${{ matrix.node }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor package.json declares; 24 is what a fresh deployment
+        # would pick up. Testing only one of them checks half the claim.
+        node: ['20.19', '24']
     defaults:
       run:
         working-directory: server
@@ -23,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: server/package-lock.json
 
@@ -39,11 +46,18 @@ jobs:
           path: server/node_modules/.cache/mongodb-memory-server
           key: mongod-${{ runner.os }}
 
+      # Carries a coverage floor. Jest exits 0 when it collects no tests at all,
+      # so the coverage number is the only thing that tells a suite which ran
+      # nothing apart from a suite which passed.
       - run: npm run test:ci
 
   client:
-    name: Client
+    name: Client - Node ${{ matrix.node }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20.19', '24']
     defaults:
       run:
         working-directory: client
@@ -53,7 +67,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: client/package-lock.json
 
@@ -63,11 +77,37 @@ jobs:
 
       - run: npm run typecheck
 
-      - run: npm test
+      - run: npm run test:ci
 
       # Catches anything that only fails in a production build, such as an
       # import that resolves in dev but not under Rollup.
       - run: npm run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [server, client]
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+
+      - run: npm ci
+
+      # The whole tree, dev included: a compromised test runner or build plugin
+      # runs on every machine that checks this out.
+      - run: npm audit --audit-level=low
 
   docker:
     name: Docker build
@@ -80,3 +120,109 @@ jobs:
 
       - name: Build client image
         run: docker build -t wellnesshub-client ./client
+
+  compose:
+    name: Compose boot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The unit suite runs against mongodb-memory-server and the Docker job
+      # only builds images. Neither would notice the stack failing to come up:
+      # a bad env default, a wrong service name, a port that never opens.
+      - name: Start the stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+
+      - name: Wait for the API to answer
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:5000/health > /dev/null; then
+              echo "API healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API never became healthy"
+          docker compose logs --no-color
+          exit 1
+
+      - name: Client is served
+        run: curl -fsS http://localhost:3000 > /dev/null
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  hygiene:
+    name: Plain ASCII and no tracked build output
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No em dashes, emoji or arrows in tracked files
+        run: |
+          if git ls-files -z | xargs -0 grep -nP \
+            '[\x{2013}\x{2014}\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}\x{2190}-\x{21FF}\x{2B00}-\x{2BFF}]' \
+            --binary-files=without-match; then
+            echo "Found a forbidden character above."
+            exit 1
+          fi
+          echo "clean"
+
+      - name: No entity or escape forms of the same characters
+        run: |
+          if git ls-files -z | xargs -0 grep -nP \
+            '&(mdash|ndash|rarr|larr|harr|rArr|lArr|#821[123469]|#x201[34]|#8594|#8592|#x219[02]);' \
+            --binary-files=without-match; then
+            echo "Found an entity that renders as a forbidden character."
+            exit 1
+          fi
+          echo "clean"
+
+      # .gitignore does not stop git add -f, which is how build output and
+      # dependency trees get committed in the first place.
+      - name: No build output, dependencies or capture harness tracked
+        run: |
+          if git ls-files | grep -E '(^|/)(node_modules|dist|build|coverage)/|__capture\.html$|\.env$'; then
+            echo "Tracked path that should not be in the repository."
+            exit 1
+          fi
+          echo "clean"
+
+  readme-images:
+    name: Every README image exists
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Referenced screenshots are present
+        run: |
+          missing=0
+          for f in README.md README-light.md; do
+            [ -f "$f" ] || continue
+            while read -r path; do
+              [ -z "$path" ] && continue
+              if [ ! -f "$path" ]; then
+                echo "$f references a missing file: $path"
+                missing=1
+              fi
+            done < <(grep -oE 'docs/screenshots/[A-Za-z0-9/._-]+' "$f" | sort -u)
+          done
+          exit "$missing"
+
+  readme-pair:
+    name: README-light.md is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Regenerate and diff
+        run: |
+          node scripts/build-light-readme.mjs
+          git diff --exit-code README-light.md

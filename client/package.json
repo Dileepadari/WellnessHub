@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test:ci": "vitest run --coverage"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.2",
@@ -37,6 +38,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
