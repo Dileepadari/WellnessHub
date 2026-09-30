@@ -576,7 +576,7 @@ router.post('/:id/progress', protect, validateResource(Challenge), [
  *       200:
  *         description: Leaderboard retrieved successfully
  */
-router.get('/:id/leaderboard', validateResource(Challenge), async (req, res, next) => {
+router.get('/:id/leaderboard', protect, validateResource(Challenge), async (req, res, next) => {
   try {
     const challenge = req.resource;
     const { limit = 50 } = req.query;

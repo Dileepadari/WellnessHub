@@ -103,30 +103,45 @@ describe('GET /api/users/:id', () => {
 });
 
 describe('GET /api/users/search', () => {
+  let token;
+
   beforeEach(async () => {
-    await registerUser({ username: 'alice_w', email: 'a@example.com', firstName: 'Alice' });
+    ({ token } = await registerUser({
+      username: 'alice_w', email: 'a@example.com', firstName: 'Alice'
+    }));
     await registerUser({ username: 'bob_x', email: 'b@example.com', firstName: 'Bob' });
     await registerUser({ username: 'carol_y', email: 'c@example.com', firstName: 'Carol' });
   });
 
-  it('matches a substring', async () => {
+  const search = (query) =>
+    request(app).get(`/api/users/search?${query}`).set('Authorization', `Bearer ${token}`);
+
+  it('refuses a caller with no token', async () => {
+    // This returns real first and last names for a two-character substring.
+    // It answered anyone who asked until 2026-09-30.
     const res = await request(app).get('/api/users/search?q=ali');
+
+    expect(res.status).toBe(401);
+  });
+
+  it('matches a substring', async () => {
+    const res = await search('q=ali');
 
     expect(res.status).toBe(200);
     expect(res.body.data.map((u) => u.username)).toEqual(['alice_w']);
   });
 
   it('treats a regex metacharacter as a literal', async () => {
-    const res = await request(app).get(`/api/users/search?q=${encodeURIComponent('.*')}`);
+    const res = await search(`q=${encodeURIComponent('.*')}`);
 
     // Passed through raw, this matched every document and returned the whole
-    // user directory to a caller with no credentials.
+    // user directory in one request.
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
   });
 
   it('does not let an anchored alternation widen the match', async () => {
-    const res = await request(app).get(`/api/users/search?q=${encodeURIComponent('^(a|b)')}`);
+    const res = await search(`q=${encodeURIComponent('^(a|b)')}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([]);
@@ -145,7 +160,7 @@ describe('GET /api/users/search', () => {
       }))
     );
 
-    const res = await request(app).get('/api/users/search?q=bulkuser&limit=100000');
+    const res = await search('q=bulkuser&limit=100000');
 
     // limit went into .limit(parseInt(limit)) uncapped, so one request could
     // ask for the entire collection.

@@ -366,7 +366,7 @@ bearer token is required.
 | POST | `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password` | - | Acknowledgement |
 | POST | `/auth/change-password` | yes | Password replaced |
 | GET/PUT | `/users/profile` | yes | `{ user }` |
-| GET | `/users/stats`, `/users/leaderboard`, `/users/search` | mixed | Progression figures, rankings |
+| GET | `/users/stats`, `/users/leaderboard`, `/users/search` | yes | Progression figures, rankings. All three need a token since 2026-09-30: the last two return real names |
 | GET | `/health/metrics` | - | Metric definitions the client renders columns from |
 | GET | `/health/summary?days=` | yes | Per-metric current value, goal, progress, series, streaks |
 | GET/POST | `/health/activities` | yes | List, or log one and award points |
@@ -387,10 +387,10 @@ bearer token is required.
 | GET | `/challenges` | - | Filterable by category, type, difficulty |
 | GET | `/challenges/mine` | yes | Joined challenges with measured progress |
 | POST | `/challenges/:id/join`, `/:id/progress` | yes | Join or record progress |
-| GET/POST | `/community/teams`, `/teams/:id/join` | mixed | List, create or join a team |
+| GET/POST | `/community/teams`, `/teams/:id/join` | yes | List, create or join a team. The list populates its creator's real name, so it needs a token since 2026-09-30 |
 | GET | `/community/feed` | yes | Shared activities from people you follow |
 | POST | `/community/share` | yes | Push a milestone to your feed |
-| GET | `/community/leaderboard` | - | `{ type, period, leaderboard[] }` |
+| GET | `/community/leaderboard` | yes | `{ type, period, leaderboard[] }`, with real names, so it needs a token since 2026-09-30 |
 | GET | `/gamification/achievements`, `/progress` | mixed | Catalogue, and level/points/streak |
 | POST | `/gamification/daily-bonus`, `/spend-points` | yes | Claim or spend |
 | GET | `/analytics/dashboard?period=` | yes | Cross-module figures for the overview |
@@ -706,6 +706,17 @@ Things that have already caused bugs here:
 - **Never interpolate user input into a `$regex`.** `/users/search` passed the term straight
   through, so `.*` matched every document and returned the whole user directory to a caller
   with no credentials. Escape the metacharacters and cap the page size.
+- **Escaping the query was the smaller half of that bug.** Capping the page and escaping the
+  term stopped one caller taking the directory in a single request. It did not stop an anonymous
+  caller looking names up two characters at a time, and it did nothing for the four other
+  endpoints with the same projection. Six endpoints returned real first and last names with no
+  token: user search, three leaderboards, the per-challenge leaderboard and the team list. None
+  of them was reachable from the app that way, because the client renders `<AuthScreen />` until
+  there is a user, and two had no caller at all. They all take `protect` now, and
+  `tests/anonymous-access.test.js` asserts each one 401s without a token and answers with one.
+  `/community/stats` is asserted **public** in the same file, because counts describe the service
+  rather than the people in it - so "public" stays a decision someone made rather than a route
+  nobody looked at.
 - **When two paths remove or authorise the same thing, one of them knows less.** The event hub's
   error path deleted a subscriber without the cleanup its normal path did; `join-team` skipped
   the team-type check the REST route enforces. Route both through one function rather than

@@ -336,7 +336,7 @@ router.get('/achievements/:id', async (req, res, next) => {
  *       200:
  *         description: Leaderboard retrieved successfully
  */
-router.get('/leaderboard', async (req, res, next) => {
+router.get('/leaderboard', protect, async (req, res, next) => {
   try {
     const { category = 'points', timeframe = 'all-time', limit = 50 } = req.query;
     

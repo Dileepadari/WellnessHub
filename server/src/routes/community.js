@@ -113,7 +113,7 @@ router.get('/feed', protect, async (req, res, next) => {
  *     security:
  *       - bearerAuth: []
  */
-router.get('/teams', async (req, res, next) => {
+router.get('/teams', protect, async (req, res, next) => {
   try {
     const { search, category, limit = 20 } = req.query;
 
@@ -281,7 +281,7 @@ router.post('/teams/:id/join', protect, validateResource(Team), async (req, res,
  *       200:
  *         description: Leaderboard retrieved successfully
  */
-router.get('/leaderboard', async (req, res, next) => {
+router.get('/leaderboard', protect, async (req, res, next) => {
   try {
     const { type = 'users', period = 'weekly', limit = 50 } = req.query;
     

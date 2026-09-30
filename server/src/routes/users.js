@@ -226,7 +226,7 @@ router.get('/stats', protect, async (req, res, next) => {
  *       200:
  *         description: Leaderboard retrieved successfully
  */
-router.get('/leaderboard', async (req, res, next) => {
+router.get('/leaderboard', protect, async (req, res, next) => {
   try {
     const { category = 'totalPoints', limit = 10 } = req.query;
     const validCategories = ['totalPoints', 'level', 'currentStreak'];
@@ -278,7 +278,14 @@ router.get('/leaderboard', async (req, res, next) => {
  *       400:
  *         description: Search query required
  */
-router.get('/search', async (req, res, next) => {
+// Signed in only, since 2026-09-30. This returns real first and last names for
+// anything matching a two-character substring, which is a directory of the user
+// base to whoever asks for it, fifty rows at a time. Escaping the term and
+// capping the page stopped one caller taking the whole thing in one request; it
+// did not stop the lookups. Nothing in the client ever called this endpoint,
+// and the client renders `<AuthScreen />` until there is a user, so no page
+// loses anything by it needing a credential.
+router.get('/search', protect, async (req, res, next) => {
   try {
     const { q, limit = 10 } = req.query;
 
